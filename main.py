@@ -1,13 +1,17 @@
 import sys
 from antlr4 import *
-from CalculatorLexer import CalculatorLexer
-from CalculatorParser import CalculatorParser
+from ExprLexer import ExprLexer
+from ExprParser import ExprParser
 
-def main():
-    lexer = CalculatorLexer(InputStream(input('? ')))
+
+def main(argv):
+    input_stream = FileStream(argv[1])
+    lexer = ExprLexer(input_stream)
     stream = CommonTokenStream(lexer)
-    parser = CalculatorParser(stream)
+    parser = ExprParser(stream)
     tree = parser.prog()
+    print(tree.toStringTree(recog=parser))
 
-if __name__ == '__main__':
-    main()
+
+if __name__ == "__main__":
+    main(sys.argv)
