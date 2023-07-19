@@ -23,8 +23,6 @@ def id_generator():
 
 
 def plot_tree(parser, tree):
-    ids = id_generator()
-
     def build_node(node, parent=None):
         node_type = type(node).__name__
 
@@ -33,17 +31,15 @@ def plot_tree(parser, tree):
                 return  # Ignore EOF
             label = str(node)
         elif node_type.endswith("Context"):
-            label = node_type.split("Context")[0]
-            if label in ["Expr", "Atom", "ID", "STRING"]:
-                label += f" {next(ids)}"
+            # Append last 4 digits of id to make nodes distinguishable
+            label = f"{node_type.split('Context')[0]}_{str(id(node))[-4:]}"
         else:
-            label = f"{next(ids)}: {node_type} - {str(node)}"
+            label = f"{node_type} - {str(node)}"
 
-        # For recursive rules, use the existing parent node
-        if node_type in ["program", "statement", "condition", "expression"]:
-            any_node = parent
-        else:
-            any_node = Node(label, parent=parent)
+        if " - []" in label:
+            label = label.replace(" - []", "")  # Remove empty tags
+
+        any_node = Node(label, parent=parent)
 
         if isinstance(node, RuleContext):
             for i in range(node.getChildCount()):
@@ -64,6 +60,17 @@ def plot_tree(parser, tree):
     # Export to .dot file
     DotExporter(root).to_dotfile("tree.dot")
 
+    # Open the .dot file and add graph attributes for layout
+    with open("tree.dot", "r+") as f:
+        content = f.read()
+        f.seek(0, 0)
+        f.write("digraph tree {\n")
+        f.write("rankdir=TB;\n")  # Direction top-to-bottom
+        f.write("nodesep=0.6;\n")  # Increase horizontal node separation
+        f.write("ranksep=0.8;\n")  # Increase vertical rank separation
+        f.write(content)
+        f.write("\n}")
+
     # Render the tree to an image using Graphviz
     os.system("dot -Tpng tree.dot -o tree.png")
 
@@ -80,9 +87,7 @@ def main(argv):
     parser.removeErrorListeners()
     parser.addErrorListener(CustomErrorListener())
 
-    tree = (
-        parser.program()
-    )  # Reemplazado 'prog()' por 'program()', como definido en la gramática YAPL
+    tree = parser.program()
 
     print(Trees.toStringTree(tree, None, parser))
 
