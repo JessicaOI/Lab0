@@ -1,28 +1,103 @@
 digraph {
-	"[]" [label="[]"]
-	"[4]" [label="[4]"]
-	"[]" -> "[4]"
-	"[2 4]" [label="[2 4]"]
-	"[4]" -> "[2 4]"
-	3 [label=3]
-	"[2 4]" -> 3
-	"+" [label="+"]
-	"[4]" -> "+"
-	"[25 4]" [label="[25 4]"]
-	"[4]" -> "[25 4]"
-	"[2 25 4]" [label="[2 25 4]"]
-	"[25 4]" -> "[2 25 4]"
-	2 [label=2]
-	"[2 25 4]" -> 2
-	"*" [label="*"]
-	"[25 4]" -> "*"
-	"[22 25 4]" [label="[22 25 4]"]
-	"[25 4]" -> "[22 25 4]"
-	4 [label=4]
-	"[22 25 4]" -> 4
-	"
-" [label="
-"]
-	"[]" -> "
-"
+	"0: ProgContext" [label="[]"]
+	"1: DeclareContext" [label="[8]"]
+	0:" ProgContext" -> 1:" DeclareContext"
+	"2: TerminalNodeImpl" [label=var]
+	1:" DeclareContext" -> 2:" TerminalNodeImpl"
+	"3: TerminalNodeImpl" [label=x]
+	1:" DeclareContext" -> 3:" TerminalNodeImpl"
+	"4: TerminalNodeImpl" [label="="]
+	1:" DeclareContext" -> 4:" TerminalNodeImpl"
+	"5: IntContext" [label="[26 8]"]
+	1:" DeclareContext" -> 5:" IntContext"
+	"6: TerminalNodeImpl" [label=5]
+	5:" IntContext" -> 6:" TerminalNodeImpl"
+	"7: TerminalNodeImpl" [label=";"]
+	1:" DeclareContext" -> 7:" TerminalNodeImpl"
+	"8: DeclareContext" [label="[8]"]
+	0:" ProgContext" -> 8:" DeclareContext"
+	"9: TerminalNodeImpl" [label=var]
+	8:" DeclareContext" -> 9:" TerminalNodeImpl"
+	"10: TerminalNodeImpl" [label=y]
+	8:" DeclareContext" -> 10:" TerminalNodeImpl"
+	"11: TerminalNodeImpl" [label="="]
+	8:" DeclareContext" -> 11:" TerminalNodeImpl"
+	"12: IntContext" [label="[26 8]"]
+	8:" DeclareContext" -> 12:" IntContext"
+	"13: TerminalNodeImpl" [label=3]
+	12:" IntContext" -> 13:" TerminalNodeImpl"
+	"14: TerminalNodeImpl" [label=";"]
+	8:" DeclareContext" -> 14:" TerminalNodeImpl"
+	"15: AssignContext" [label="[8]"]
+	0:" ProgContext" -> 15:" AssignContext"
+	"16: TerminalNodeImpl" [label=x]
+	15:" AssignContext" -> 16:" TerminalNodeImpl"
+	"17: TerminalNodeImpl" [label="="]
+	15:" AssignContext" -> 17:" TerminalNodeImpl"
+	"18: AddSubContext" [label="[20 8]"]
+	15:" AssignContext" -> 18:" AddSubContext"
+	"19: IdContext" [label="[6 20 8]"]
+	18:" AddSubContext" -> 19:" IdContext"
+	"20: TerminalNodeImpl" [label=x]
+	19:" IdContext" -> 20:" TerminalNodeImpl"
+	"21: TerminalNodeImpl" [label="+"]
+	18:" AddSubContext" -> 21:" TerminalNodeImpl"
+	"22: MulDivContext" [label="[55 20 8]"]
+	18:" AddSubContext" -> 22:" MulDivContext"
+	"23: IdContext" [label="[6 55 20 8]"]
+	22:" MulDivContext" -> 23:" IdContext"
+	"24: TerminalNodeImpl" [label=y]
+	23:" IdContext" -> 24:" TerminalNodeImpl"
+	"25: TerminalNodeImpl" [label="*"]
+	22:" MulDivContext" -> 25:" TerminalNodeImpl"
+	"26: IntContext" [label="[52 55 20 8]"]
+	22:" MulDivContext" -> 26:" IntContext"
+	"27: TerminalNodeImpl" [label=2]
+	26:" IntContext" -> 27:" TerminalNodeImpl"
+	"28: TerminalNodeImpl" [label=";"]
+	15:" AssignContext" -> 28:" TerminalNodeImpl"
+	"29: IfStatementContext" [label="[8]"]
+	0:" ProgContext" -> 29:" IfStatementContext"
+	"30: IfStatContext" [label="[30 8]"]
+	29:" IfStatementContext" -> 30:" IfStatContext"
+	"31: TerminalNodeImpl" [label=if]
+	30:" IfStatContext" -> 31:" TerminalNodeImpl"
+	"32: IdContext" [label="[34 30 8]"]
+	30:" IfStatContext" -> 32:" IdContext"
+	"33: TerminalNodeImpl" [label=x]
+	32:" IdContext" -> 33:" TerminalNodeImpl"
+	"34: TerminalNodeImpl" [label=then]
+	30:" IfStatContext" -> 34:" TerminalNodeImpl"
+	"35: DeclareContext" [label="[36 30 8]"]
+	30:" IfStatContext" -> 35:" DeclareContext"
+	"36: TerminalNodeImpl" [label=var]
+	35:" DeclareContext" -> 36:" TerminalNodeImpl"
+	"37: TerminalNodeImpl" [label=z]
+	35:" DeclareContext" -> 37:" TerminalNodeImpl"
+	"38: TerminalNodeImpl" [label="="]
+	35:" DeclareContext" -> 38:" TerminalNodeImpl"
+	"39: IntContext" [label="[26 36 30 8]"]
+	35:" DeclareContext" -> 39:" IntContext"
+	"40: TerminalNodeImpl" [label=1]
+	39:" IntContext" -> 40:" TerminalNodeImpl"
+	"41: TerminalNodeImpl" [label=";"]
+	35:" DeclareContext" -> 41:" TerminalNodeImpl"
+	"42: TerminalNodeImpl" [label=else]
+	30:" IfStatContext" -> 42:" TerminalNodeImpl"
+	"43: DeclareContext" [label="[38 30 8]"]
+	30:" IfStatContext" -> 43:" DeclareContext"
+	"44: TerminalNodeImpl" [label=var]
+	43:" DeclareContext" -> 44:" TerminalNodeImpl"
+	"45: TerminalNodeImpl" [label=z]
+	43:" DeclareContext" -> 45:" TerminalNodeImpl"
+	"46: TerminalNodeImpl" [label="="]
+	43:" DeclareContext" -> 46:" TerminalNodeImpl"
+	"47: IntContext" [label="[26 38 30 8]"]
+	43:" DeclareContext" -> 47:" IntContext"
+	"48: TerminalNodeImpl" [label=2]
+	47:" IntContext" -> 48:" TerminalNodeImpl"
+	"49: TerminalNodeImpl" [label=";"]
+	43:" DeclareContext" -> 49:" TerminalNodeImpl"
+	"50: TerminalNodeImpl" [label=<EOF>]
+	0:" ProgContext" -> 50:" TerminalNodeImpl"
 }

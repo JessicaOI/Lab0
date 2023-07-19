@@ -1,1 +1,29 @@
-(prog (expr (expr 3) + (expr (expr 2) * (expr 4))) \r\n)
+digraph tree {
+    "Prog";
+    "Expr 0";
+    "Expr 1";
+    "3";
+    "+";
+    "Expr 2";
+    "Expr 3";
+    "5";
+    "*";
+    "Expr 4";
+    "(";
+    "Expr 5";
+    "8";
+    ")";
+    "Prog" -> "Expr 0";
+    "Expr 0" -> "Expr 1";
+    "Expr 0" -> "+";
+    "Expr 0" -> "Expr 2";
+    "Expr 1" -> "3";
+    "Expr 2" -> "Expr 3";
+    "Expr 2" -> "*";
+    "Expr 2" -> "Expr 4";
+    "Expr 3" -> "5";
+    "Expr 4" -> "(";
+    "Expr 4" -> "Expr 5";
+    "Expr 4" -> ")";
+    "Expr 5" -> "8";
+}
