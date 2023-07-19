@@ -1,11 +1,11 @@
 # Lab0
 
-Comandos
+## Comandos
 
-Compilar 
+## Compilar 
 
 java -jar antlr-4.13.0-complete.jar -Dlanguage=Python3 Expr.g4   
 
-Run Python Program
+## Run Python Program
 
 python main.py input.txt   
