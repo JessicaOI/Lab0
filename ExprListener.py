@@ -5,12 +5,6 @@ if "." in __name__:
 else:
     from ExprParser import ExprParser
 
-    import sys
-    from antlr4 import *
-    if sys.version_info[0] >= 3:
-        raw_input = input     # Python 3 compatibility
-
-
 # This class defines a complete listener for a parse tree produced by ExprParser.
 class ExprListener(ParseTreeListener):
 
@@ -29,6 +23,15 @@ class ExprListener(ParseTreeListener):
 
     # Exit a parse tree produced by ExprParser#expr.
     def exitExpr(self, ctx:ExprParser.ExprContext):
+        pass
+
+
+    # Enter a parse tree produced by ExprParser#atom.
+    def enterAtom(self, ctx:ExprParser.AtomContext):
+        pass
+
+    # Exit a parse tree produced by ExprParser#atom.
+    def exitAtom(self, ctx:ExprParser.AtomContext):
         pass
 
 

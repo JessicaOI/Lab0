@@ -1,34 +1,30 @@
 grammar YAPL;
 
-prog: stat+ EOF;
+// Parser rules
+program: statement+;
 
-stat: expr ';'                 # printExpr
-    | ID '=' expr ';'          # assign
-    | 'var' ID ('=' expr)? ';' # declare
-    | ifStat                   # ifStatement
+statement: 
+      'print' expression
+    | ID '=' expression
+    | 'if' condition 'then' statement ('else' statement)?
+    | 'while' condition 'do' statement
+    | '{' statement+ '}'
     ;
 
-ifStat: 'if' expr 'then' stat ('else' stat)?;
-
-expr: expr op=('*'|'/') expr  # mulDiv
-    | expr op=('+'|'-') expr  # addSub
-    | ID                      # id
-    | INT                     # int
-    | '(' expr ')'            # parens
+expression: 
+      INT
+    | ID
+    | expression ('+' | '-') expression
+    | '(' expression ')'
     ;
 
-MUL : '*';
-DIV : '/';
-ADD : '+';
-SUB : '-';
-EQ  : '=';
-SEMI: ';';
+condition:
+      expression ('==' | '<' | '>') expression
+    | 'not' condition
+    | '(' condition ')'
+    ;
 
-IF  : 'if';
-THEN: 'then';
-ELSE: 'else';
-VAR : 'var';
-
-ID  : [a-zA-Z]+ ;
+// Lexer rules
+ID  : [a-zA-Z_][a-zA-Z_0-9]* ;
 INT : [0-9]+ ;
-WS  : [ \t\n\r]+ -> skip ; // ignora espacios en blanco, tabulaciones y saltos de línea
+WS  : [ \r\n\t]+ -> skip ;
