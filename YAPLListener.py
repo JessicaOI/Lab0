@@ -17,12 +17,66 @@ class YAPLListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by YAPLParser#classDef.
+    def enterClassDef(self, ctx:YAPLParser.ClassDefContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#classDef.
+    def exitClassDef(self, ctx:YAPLParser.ClassDefContext):
+        pass
+
+
+    # Enter a parse tree produced by YAPLParser#feature.
+    def enterFeature(self, ctx:YAPLParser.FeatureContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#feature.
+    def exitFeature(self, ctx:YAPLParser.FeatureContext):
+        pass
+
+
     # Enter a parse tree produced by YAPLParser#statement.
     def enterStatement(self, ctx:YAPLParser.StatementContext):
         pass
 
     # Exit a parse tree produced by YAPLParser#statement.
     def exitStatement(self, ctx:YAPLParser.StatementContext):
+        pass
+
+
+    # Enter a parse tree produced by YAPLParser#expressionStatement.
+    def enterExpressionStatement(self, ctx:YAPLParser.ExpressionStatementContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#expressionStatement.
+    def exitExpressionStatement(self, ctx:YAPLParser.ExpressionStatementContext):
+        pass
+
+
+    # Enter a parse tree produced by YAPLParser#returnStatement.
+    def enterReturnStatement(self, ctx:YAPLParser.ReturnStatementContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#returnStatement.
+    def exitReturnStatement(self, ctx:YAPLParser.ReturnStatementContext):
+        pass
+
+
+    # Enter a parse tree produced by YAPLParser#formals.
+    def enterFormals(self, ctx:YAPLParser.FormalsContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#formals.
+    def exitFormals(self, ctx:YAPLParser.FormalsContext):
+        pass
+
+
+    # Enter a parse tree produced by YAPLParser#formal.
+    def enterFormal(self, ctx:YAPLParser.FormalContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#formal.
+    def exitFormal(self, ctx:YAPLParser.FormalContext):
         pass
 
 
@@ -35,12 +89,21 @@ class YAPLListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by YAPLParser#condition.
-    def enterCondition(self, ctx:YAPLParser.ConditionContext):
+    # Enter a parse tree produced by YAPLParser#openBrace.
+    def enterOpenBrace(self, ctx:YAPLParser.OpenBraceContext):
         pass
 
-    # Exit a parse tree produced by YAPLParser#condition.
-    def exitCondition(self, ctx:YAPLParser.ConditionContext):
+    # Exit a parse tree produced by YAPLParser#openBrace.
+    def exitOpenBrace(self, ctx:YAPLParser.OpenBraceContext):
+        pass
+
+
+    # Enter a parse tree produced by YAPLParser#closeBrace.
+    def enterCloseBrace(self, ctx:YAPLParser.CloseBraceContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#closeBrace.
+    def exitCloseBrace(self, ctx:YAPLParser.CloseBraceContext):
         pass
 
 
