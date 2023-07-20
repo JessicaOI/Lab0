@@ -89,23 +89,5 @@ class YAPLListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by YAPLParser#openBrace.
-    def enterOpenBrace(self, ctx:YAPLParser.OpenBraceContext):
-        pass
-
-    # Exit a parse tree produced by YAPLParser#openBrace.
-    def exitOpenBrace(self, ctx:YAPLParser.OpenBraceContext):
-        pass
-
-
-    # Enter a parse tree produced by YAPLParser#closeBrace.
-    def enterCloseBrace(self, ctx:YAPLParser.CloseBraceContext):
-        pass
-
-    # Exit a parse tree produced by YAPLParser#closeBrace.
-    def exitCloseBrace(self, ctx:YAPLParser.CloseBraceContext):
-        pass
-
-
 
 del YAPLParser

@@ -3,29 +3,24 @@ grammar YAPL;
 // Parser rules
 program: classDef+;
 
-classDef: CLASS TYPE_ID (INHERITS TYPE_ID)? openBrace feature* closeBrace SEMI;
+classDef: CLASS TYPE_ID (INHERITS TYPE_ID)? feature* SEMI;
 
 feature: 
     OBJECT_ID COLON TYPE_ID SEMI
-    | OBJECT_ID LPAREN formals? RPAREN COLON TYPE_ID openBrace statement* closeBrace
+    | OBJECT_ID LPAREN formals? RPAREN COLON TYPE_ID statement*
 ;
 
 statement: 
     'if' expression 'then' statement 'else' statement 'fi'  
     | 'while' expression 'loop' statement 'pool' 
-    | openBrace statement* closeBrace 
-    | expressionStatement SEMI
-    | returnStatement SEMI
+    | LCURLY statement* RCURLY 
+    | expressionStatement
+    | returnStatement
 ;
 
-expressionStatement:
-    | OBJECT_ID '<-' expression 
-    | expression 
-;
+expressionStatement: OBJECT_ID ASSIGN expression SEMI;
 
-returnStatement: 
-    'return' expression
-;
+returnStatement: 'return' expression SEMI;
 
 formals: formal (',' formal)*;
 formal: OBJECT_ID ':' TYPE_ID;
@@ -48,9 +43,6 @@ expression
     | NOT expression
     | TILDE expression
 ;
-
-openBrace: LCURLY;
-closeBrace: RCURLY;
 
 // Lexer rules
 CLASS: 'class';

@@ -13,30 +13,32 @@ class CustomErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
         print(f"Line {line}:{column} {msg}")
 
-def id_generator():
-    id = 0
-    while True:
-        yield id
-        id += 1
-
 def plot_tree(parser, tree):
     def build_node(node, parent=None):
         node_type = type(node).__name__
 
         if isinstance(node, TerminalNode):
-            label = Trees.getNodeText(
-                node, parser
-            )  
+            label = Trees.getNodeText(node, parser)
         else:
             label = node_type.split("Context")[0] if node_type.endswith("Context") else node_type
+
+        # Handling braces and semicolon
+        if label == "LCURLY":
+            label = "{"
+        elif label == "RCURLY":
+            label = "}"
+        elif label == "SEMI":
+            label = ";"
+
+        # Ignore empty nodes
+        if label.strip() == "":
+            return None
 
         label_with_id = label + f"_{id(node)}"
         label_with_id = re.sub(r"[^\w]", "", label_with_id)
         label = re.sub(r"[^\w]", "", label)
 
-        any_node = Node(
-            label_with_id, parent=parent, displayed_label=label
-        )  
+        any_node = Node(label_with_id, parent=parent, displayed_label=label)
 
         if not isinstance(node, TerminalNode):
             for i in range(node.getChildCount()):
