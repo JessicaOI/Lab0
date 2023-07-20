@@ -12,19 +12,49 @@ import re
 class CustomErrorListener(ErrorListener):
     def __init__(self):
         super().__init__()
-        self.error_messages = []
+        self.error_messages = set()  # Ahora es un conjunto para evitar duplicados
 
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        error_message = f"Line {line}:{column} {msg}"
-        print(error_message)
-        self.error_messages.append(error_message)
+        # Asegúrate de que cada mensaje de error sea único
+        if "missing ')' at" in msg or ("mismatched input" in msg and offendingSymbol.text == '('):
+            error_msg = f"Linea {line}:{column} Error: parentesis sin cerrar"
+        elif "extraneous input" in msg and offendingSymbol.text == ')':
+            error_msg = f"Linea {line}:{column} Error: parentesis sin abrir"
+        elif "no viable alternative" in msg:
+            error_msg = f"Linea {line}:{column} Error: token no reconocido '{offendingSymbol.text}'"
+        elif "mismatched input" in msg and offendingSymbol.text in ['+', '-', '*', '/']:
+            error_msg = f"Linea {line}:{column} Error: No hay operadores que debe contener el lenguaje"
+        elif "token recognition error at" in msg:
+            error_msg = f"Linea {line}:{column} Error: operador no puede estar al inicio de la cadena"
+        elif "missing NEWLINE at '<EOF>'" in msg:
+            error_msg = f"Linea {line}:{column} Error: se esperaba un salto de línea al final de la entrada"
+        elif "extraneous input '\\r\\n' expecting {'(', INT}" in msg:
+            error_msg = f"Linea {line}:{column} Error: Para iniciar una linea de texto debe empezar con un numero o abriendo un parentesis"
+        elif "extraneous input 'class' expecting" in msg:
+            error_msg = f"Linea {line}:{column} Error: Entrada inesperada 'class', se esperaba '}}' o OBJECT_ID"
+        elif "missing ';' at 'else'" in msg:
+            error_msg = f"Linea {line}:{column} Error: Falta ';' después de 'else'"
+        elif "missing '<-' at" in msg:
+            error_msg = f"Linea {line}:{column} Error: Falta '<-' en la asignación"
+        elif "mismatched input '<EOF>' expecting ';'" in msg:
+            error_msg = f"Linea {line}:{column} Error: Se esperaba ';' antes de finalizar el archivo"
+        elif "missing 'fi' at ';'" in msg:
+            error_msg = f"Linea {line}:{column} Error: Falta 'fi' antes de ';'"
+        elif "missing ';' at 'secondMethod'" in msg:
+            error_msg = f"Linea {line}:{column} Error: Falta ';' después de 'secondMethod'"
+        elif "extraneous input '}' expecting ';'" in msg:
+            error_msg = f"Linea {line}:{column} Error: Entrada inesperada se esperaba ';'"
+        elif "mismatched input ';' expecting" in msg:
+            error_msg = f"Linea {line}:{column} Error: Entrada inesperada ';', se esperaban otros tokens"
+        elif "Error: token no reconocido 'String'" in msg:
+            error_msg = f"Linea {line}:{column} Error: token no reconocido 'String'"
+        elif "extraneous input ';' expecting" in msg:
+            error_msg = f"Linea {line}:{column} Error: Entrada inesperada ';', se esperaba '{{', '}}', 'if', 'while', 'return', o OBJECT_ID"
+        else:
+            error_msg = f"Linea {line}:{column} {msg}"
 
-    def has_errors(self):
-        return len(self.error_messages) > 0
+        self.error_messages.add(error_msg)
 
-    def raise_errors(self):
-        if self.has_errors():
-            raise Exception("There were errors during parsing:\n" + "\n".join(self.error_messages))
 
 
 def plot_tree(parser, tree):
@@ -80,26 +110,28 @@ def main(argv):
     lexer = YAPLLexer(input_stream)
     stream = CommonTokenStream(lexer)
 
-    # lexer.removeErrorListeners()
-    # lexer.addErrorListener(CustomErrorListener())
+    error_listener = CustomErrorListener()
 
     parser = YAPLParser(stream)
     parser.removeErrorListeners()
-    parser.addErrorListener(CustomErrorListener())
+    parser.addErrorListener(error_listener)
 
     try:
         tree = parser.program()
 
         if parser.getNumberOfSyntaxErrors() > 0:
-            print("Parsing finished with errors. Halting execution.")
+            print("Se detectaron los siguientes errores:")
+            for error in error_listener.error_messages:  
+                print(error)
+            print("Finalizando el programa.")
             return
+
 
         print(Trees.toStringTree(tree, None, parser))
 
         plot_tree(parser, tree)
     except Exception as e:
         print(e)
-
 
 
 if __name__ == "__main__":
