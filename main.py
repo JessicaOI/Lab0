@@ -10,8 +10,22 @@ from anytree.exporter import DotExporter
 import re
 
 class CustomErrorListener(ErrorListener):
+    def __init__(self):
+        super().__init__()
+        self.error_messages = []
+
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        print(f"Line {line}:{column} {msg}")
+        error_message = f"Line {line}:{column} {msg}"
+        print(error_message)
+        self.error_messages.append(error_message)
+
+    def has_errors(self):
+        return len(self.error_messages) > 0
+
+    def raise_errors(self):
+        if self.has_errors():
+            raise Exception("There were errors during parsing:\n" + "\n".join(self.error_messages))
+
 
 def plot_tree(parser, tree):
     def build_node(node, parent=None):
@@ -61,25 +75,32 @@ def plot_tree(parser, tree):
     os.system("dot -Tpng tree.dot -o tree.png")
 
 
-
-
 def main(argv):
     input_stream = FileStream(argv[1])
     lexer = YAPLLexer(input_stream)
     stream = CommonTokenStream(lexer)
 
-    lexer.removeErrorListeners()
-    lexer.addErrorListener(CustomErrorListener())
+    # lexer.removeErrorListeners()
+    # lexer.addErrorListener(CustomErrorListener())
 
     parser = YAPLParser(stream)
     parser.removeErrorListeners()
     parser.addErrorListener(CustomErrorListener())
 
-    tree = parser.program()
+    try:
+        tree = parser.program()
 
-    print(Trees.toStringTree(tree, None, parser))
+        if parser.getNumberOfSyntaxErrors() > 0:
+            print("Parsing finished with errors. Halting execution.")
+            return
 
-    plot_tree(parser, tree)
+        print(Trees.toStringTree(tree, None, parser))
+
+        plot_tree(parser, tree)
+    except Exception as e:
+        print(e)
+
+
 
 if __name__ == "__main__":
     main(sys.argv)
