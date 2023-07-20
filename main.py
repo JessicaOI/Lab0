@@ -26,6 +26,9 @@ def plot_tree(parser, tree):
         if label.strip() == "":
             return None
 
+        # Prepare label for Graphviz
+        label = label.replace('"', '\\"').replace(' ', '_')
+
         label_with_id = label + f"_{id(node)}"
         any_node = Node(label_with_id, parent=parent, displayed_label=label)
 
@@ -43,7 +46,7 @@ def plot_tree(parser, tree):
         print("%s%s" % (pre, node.displayed_label))
 
     DotExporter(
-        root, nodeattrfunc=lambda node: 'label="%s"' % node.displayed_label
+        root, nodeattrfunc=lambda node: 'label="%s"' % node.displayed_label.replace(' ', '_')
     ).to_dotfile("tree.dot")
 
     with open("tree.dot", "r") as f:
@@ -56,6 +59,7 @@ def plot_tree(parser, tree):
         f.writelines(content)
 
     os.system("dot -Tpng tree.dot -o tree.png")
+
 
 
 
