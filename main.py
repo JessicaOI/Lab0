@@ -22,14 +22,6 @@ def plot_tree(parser, tree):
         else:
             label = node_type.split("Context")[0] if node_type.endswith("Context") else node_type
 
-        # Handling braces and semicolon
-        if label == "LCURLY":
-            label = "{"
-        elif label == "RCURLY":
-            label = "}"
-        elif label == "SEMI":
-            label = ";"
-
         # Ignore empty nodes
         if label.strip() == "":
             return None
@@ -67,6 +59,7 @@ def plot_tree(parser, tree):
         f.writelines(content)
 
     os.system("dot -Tpng tree.dot -o tree.png")
+
 
 def main(argv):
     input_stream = FileStream(argv[1])

@@ -3,11 +3,11 @@ grammar YAPL;
 // Parser rules
 program: classDef+;
 
-classDef: CLASS TYPE_ID (INHERITS TYPE_ID)? feature* SEMI;
+classDef: CLASS TYPE_ID (INHERITS TYPE_ID)? LCURLY feature* RCURLY SEMI;
 
 feature: 
     OBJECT_ID COLON TYPE_ID SEMI
-    | OBJECT_ID LPAREN formals? RPAREN COLON TYPE_ID statement*
+    | OBJECT_ID LPAREN formals? RPAREN COLON TYPE_ID LCURLY statement* RCURLY SEMI
 ;
 
 statement: 
