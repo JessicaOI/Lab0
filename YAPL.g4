@@ -3,24 +3,24 @@ grammar YAPL;
 // Parser rules
 program: classDef+;
 
-classDef: CLASS TYPE_ID (INHERITS TYPE_ID)? LCURLY feature* RCURLY SEMI;
+classDef: CLASS TYPE_ID (INHERITS TYPE_ID)? '{' feature* '}' ';';
 
 feature: 
-    OBJECT_ID COLON TYPE_ID SEMI
-    | OBJECT_ID LPAREN formals? RPAREN COLON TYPE_ID LCURLY statement* RCURLY SEMI
+    OBJECT_ID COLON TYPE_ID ';'
+    | OBJECT_ID LPAREN formals? RPAREN COLON TYPE_ID '{' statement* '}' ';'
 ;
 
 statement: 
-    'if' expression 'then' statement 'else' statement 'fi'  
-    | 'while' expression 'loop' statement 'pool' 
-    | LCURLY statement* RCURLY 
-    | expressionStatement
-    | returnStatement
+    'if' expression 'then' statement 'else' statement 'fi' ';'
+    | 'while' expression 'loop' statement 'pool' ';'
+    | '{' statement* '}' ';'
+    | expressionStatement ';'
+    | returnStatement ';'
 ;
 
-expressionStatement: OBJECT_ID ASSIGN expression SEMI;
+expressionStatement: OBJECT_ID ASSIGN expression;
 
-returnStatement: 'return' expression SEMI;
+returnStatement: 'return' expression;
 
 formals: formal (',' formal)*;
 formal: OBJECT_ID ':' TYPE_ID;
@@ -59,9 +59,6 @@ TILDE: '~';
 WS: [ \t\r\n\f]+ -> skip;
 LINE_COMMENT: '--' .*? '\n' -> skip;
 BLOCK_COMMENT: '(*' .*? '*)' -> skip;
-LCURLY: '{';
-RCURLY: '}';
-SEMI: ';';
 LPAREN: '(';
 RPAREN: ')';
 ASSIGN: '<-';

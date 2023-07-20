@@ -27,9 +27,6 @@ def plot_tree(parser, tree):
             return None
 
         label_with_id = label + f"_{id(node)}"
-        label_with_id = re.sub(r"[^\w]", "", label_with_id)
-        label = re.sub(r"[^\w]", "", label)
-
         any_node = Node(label_with_id, parent=parent, displayed_label=label)
 
         if not isinstance(node, TerminalNode):
@@ -59,6 +56,7 @@ def plot_tree(parser, tree):
         f.writelines(content)
 
     os.system("dot -Tpng tree.dot -o tree.png")
+
 
 
 def main(argv):
