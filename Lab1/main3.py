@@ -8,6 +8,7 @@ from antlr4.error.ErrorListener import ErrorListener
 from anytree import Node, RenderTree
 from anytree.exporter import DotExporter
 import re
+from tabulate import tabulate
 
 
 class CustomErrorListener(ErrorListener):
@@ -127,8 +128,11 @@ class SymbolTable:
         return self.table.get(name, None)
 
     def print_table(self):
-        for name, info in self.table.items():
-            print(f"{name} -> {info}")
+        # tabulate takes a list of lists along with headers and formats them
+        rows = [
+            [name, info["type"], info["scope"]] for name, info in self.table.items()
+        ]
+        print(tabulate(rows, headers=["Symbol", "Type", "Scope"], tablefmt="pretty"))
 
 
 class MyYAPLListener(ParseTreeListener):
