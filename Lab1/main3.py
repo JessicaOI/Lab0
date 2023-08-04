@@ -117,64 +117,151 @@ def plot_tree(parser, tree):
     os.system("dot -Tpng tree.dot -o tree.png")
 
 
+class Symbol:
+    def __init__(
+        self,
+        name,
+        type,
+        scope,
+        lexeme,
+        token,
+        memory_pos,
+        line_num,
+        line_pos,
+        semantic_type,
+        num_params,
+        param_types,
+        pass_method,
+    ):
+        self.name = name
+        self.type = type
+        self.scope = scope
+        self.lexeme = lexeme
+        self.token = token
+        self.memory_pos = memory_pos
+        self.line_num = line_num
+        self.line_pos = line_pos
+        self.semantic_type = semantic_type
+        self.num_params = num_params
+        self.param_types = param_types
+        self.pass_method = pass_method
+
+
 class SymbolTable:
     def __init__(self):
-        self.table = {}
+        self.symbols = []
 
-    def add_symbol(self, name, type, scope):
-        self.table[name] = {"type": type, "scope": scope}
-
-    def lookup_symbol(self, name):
-        return self.table.get(name, None)
+    def add_symbol(self, symbol):
+        self.symbols.append(symbol)
 
     def print_table(self):
-        # tabulate takes a list of lists along with headers and formats them
-        rows = [
-            [name, info["type"], info["scope"]] for name, info in self.table.items()
-        ]
-        print(tabulate(rows, headers=["Symbol", "Type", "Scope"], tablefmt="pretty"))
+        for symbol in self.symbols:
+            print(
+                f"Name: {symbol.name}, Tipo de Dato: {symbol.type}, Scope: {symbol.scope}, Lexema: {symbol.lexeme}, Token: {symbol.token}, Memory Pos: {symbol.memory_pos}, Line Num: {symbol.line_num}, Line Pos: {symbol.line_pos}, Tipo Semantico: {symbol.semantic_type}, Num Params: {symbol.num_params}, Tipo de Parametros: {symbol.param_types}, Metodo para paso de parámetros: {symbol.pass_method}"
+            )
 
 
 class MyYAPLListener(ParseTreeListener):
     def __init__(self):
         self.symbol_table = SymbolTable()
+        self.current_scope = "global"
+        self.current_memory_position = 0
+        self.table = []
 
     def enterClassDef(self, ctx):
-        type_ids = ctx.TYPE_ID()
-        if isinstance(type_ids, list):
-            for type_id in type_ids:
-                self.symbol_table.add_symbol(type_id.getText(), "ClassType", "global")
-        else:
-            self.symbol_table.add_symbol(type_ids.getText(), "ClassType", "global")
+        type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
+        for type_id in type_ids:
+            type_id = type_id.getText()
+            symbol = Symbol(
+                name=type_id,
+                type="ClassType",
+                scope=self.current_scope,
+                lexeme=type_id,
+                token="ClassType",
+                memory_pos=self.current_memory_position,
+                line_num=ctx.start.line,
+                line_pos=ctx.start.column,
+                semantic_type="ClassType",
+                num_params=0,
+                param_types=[],
+                pass_method="byValue",
+            )
+            self.symbol_table.add_symbol(symbol)
+            self.current_memory_position += 1
+            self.table.append(list(symbol.__dict__.values()))
+        self.current_scope = type_ids[0].getText()
+
+    def exitClassDef(self, ctx):
+        self.current_scope = "global"
 
     def enterFeature(self, ctx):
-        object_ids = ctx.OBJECT_ID()
-        type_ids = ctx.TYPE_ID()
-        if isinstance(object_ids, list):
-            for object_id, type_id in zip(object_ids, type_ids):
-                self.symbol_table.add_symbol(
-                    object_id.getText(), type_id.getText(), "global"
-                )
-        else:
-            self.symbol_table.add_symbol(
-                object_ids.getText(), type_ids.getText(), "global"
+        object_ids = (
+            ctx.OBJECT_ID() if isinstance(ctx.OBJECT_ID(), list) else [ctx.OBJECT_ID()]
+        )
+        type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
+        for object_id, type_id in zip(object_ids, type_ids):
+            object_id = object_id.getText()
+            type_id = type_id.getText()
+            symbol = Symbol(
+                name=object_id,
+                type="Feature",
+                scope=self.current_scope,
+                lexeme=object_id,
+                token="Feature",
+                memory_pos=self.current_memory_position,
+                line_num=ctx.start.line,
+                line_pos=ctx.start.column,
+                semantic_type=type_id,
+                num_params=0,
+                param_types=[],
+                pass_method="byValue",
             )
+            self.symbol_table.add_symbol(symbol)
+            self.current_memory_position += 1
+            self.table.append(list(symbol.__dict__.values()))
 
     def enterFormal(self, ctx):
-        object_ids = ctx.OBJECT_ID()
-        type_ids = ctx.TYPE_ID()
-        if isinstance(object_ids, list):
-            for object_id, type_id in zip(object_ids, type_ids):
-                self.symbol_table.add_symbol(
-                    object_id.getText(), type_id.getText(), "local"
-                )
-        else:
-            self.symbol_table.add_symbol(
-                object_ids.getText(), type_ids.getText(), "local"
+        object_ids = (
+            ctx.OBJECT_ID() if isinstance(ctx.OBJECT_ID(), list) else [ctx.OBJECT_ID()]
+        )
+        type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
+        for object_id, type_id in zip(object_ids, type_ids):
+            object_id = object_id.getText()
+            type_id = type_id.getText()
+            symbol = Symbol(
+                name=object_id,
+                type="Formal",
+                scope=self.current_scope,
+                lexeme=object_id,
+                token="Formal",
+                memory_pos=self.current_memory_position,
+                line_num=ctx.start.line,
+                line_pos=ctx.start.column,
+                semantic_type=type_id,
+                num_params=0,
+                param_types=[],
+                pass_method="byValue",
             )
+            self.symbol_table.add_symbol(symbol)
+            self.current_memory_position += 1
+            self.table.append(list(symbol.__dict__.values()))
 
     def exitProgram(self, ctx):
-        self.symbol_table.print_table()
+        headers = [
+            "Name",
+            "Tipo de Dato",
+            "Scope",
+            "Lexema",
+            "Token",
+            "Memory Pos",
+            "Line Num",
+            "Line Pos",
+            "Tipo Semantico",
+            "Num Params",
+            "Tipo de Parametros",
+            "Metodo para paso de parámetros",
+        ]
+        print(tabulate(self.table, headers=headers))
 
 
 def main(argv):
@@ -200,11 +287,12 @@ def main(argv):
 
         print(Trees.toStringTree(tree, None, parser))
 
+        plot_tree(parser, tree)
+
         listener = MyYAPLListener()
         walker = ParseTreeWalker()
         walker.walk(listener, tree)
 
-        plot_tree(parser, tree)
     except Exception as e:
         print(e)
 
