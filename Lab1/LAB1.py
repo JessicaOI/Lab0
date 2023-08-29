@@ -9,7 +9,94 @@ from anytree import Node, RenderTree
 from anytree.exporter import DotExporter
 import re
 from tabulate import tabulate
+import tkinter as tk
+from tkinter import filedialog, messagebox, Text, simpledialog
 
+text_editor = None
+
+def initialize_text_editor(root, content):
+    global text_editor
+
+    # Crear el botón y agregarlo a la interfaz
+    execute_button = tk.Button(root, text="Ejecutar Validaciones", command=execute_functions)
+    execute_button.pack(pady=10)
+
+    # Crear el editor de texto y llenarlo con el contenido del archivo
+    text_editor = Text(root, wrap=tk.WORD)
+    text_editor.insert(tk.END, content)
+    text_editor.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
+
+
+
+
+def select_file(root):
+    global file_path
+    file_path = filedialog.askopenfilename()
+    
+    if not file_path:
+        return
+
+    with open(file_path, 'r') as file:
+        content = file.read()
+
+    initialize_text_editor(root, content)  # Inicializar el editor de texto después de seleccionar un archivo
+
+
+def validate_content():
+    global text_editor, file_path  # Agregamos file_path a las variables globales aquí
+    content = text_editor.get(1.0, tk.END).strip()
+    
+    
+    # Ahora en lugar de escribir en un archivo temporal, escribimos en el archivo seleccionado
+    with open(file_path, "w") as file:
+        file.write(content)
+
+    # Asumiendo que main() es la función que realiza la validación con ANTLR
+    main(file_path)
+
+def execute_functions():
+    global file_path
+    try:
+        # Aquí debes llamar a tus funciones de análisis sintáctico, creación de tabla de símbolos, y validaciones semánticas
+        # Por ejemplo:
+        # sintactic_analysis_function()
+        # symbol_table_creation_function()
+        # semantic_validations_function()
+
+        input_stream = FileStream(file_path)
+        lexer = YAPLLexer(input_stream)
+        stream = CommonTokenStream(lexer)
+
+        error_listener = CustomErrorListener()
+
+        parser = YAPLParser(stream)
+        parser.removeErrorListeners()
+        parser.addErrorListener(error_listener)
+
+        try:
+            tree = parser.program()
+
+            if parser.getNumberOfSyntaxErrors() > 0:
+                print("Se detectaron los siguientes errores:")
+                for error in error_listener.error_messages:
+                    print(error)
+                print("Finalizando el programa.")
+                return
+
+            print(Trees.toStringTree(tree, None, parser))
+
+            plot_tree(parser, tree)
+
+            listener = MyYAPLListener()
+            walker = ParseTreeWalker()
+            walker.walk(listener, tree)
+
+        except Exception as e:
+            print(e)
+        
+        print("Todas las funcionalidades se ejecutaron correctamente.")
+    except Exception as e:
+        print(f"Error: {e}")
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):
@@ -151,14 +238,29 @@ class SymbolTable:
     def __init__(self):
         self.symbols = []
 
-    def add_symbol(self, symbol):
-        self.symbols.append(symbol)
+    # def add_symbol(self, symbol):
+    #     self.symbols.append(symbol)
 
     def print_table(self):
         for symbol in self.symbols:
             print(
                 f"Name: {symbol.name}, Tipo de Dato: {symbol.type}, Scope: {symbol.scope}, Lexema: {symbol.lexeme}, Token: {symbol.token}, Memory Pos: {symbol.memory_pos}, Line Num: {symbol.line_num}, Line Pos: {symbol.line_pos}, Tipo Semantico: {symbol.semantic_type}, Num Params: {symbol.num_params}, Tipo de Parametros: {symbol.param_types}, Metodo para paso de parámetros: {symbol.pass_method}"
             )
+
+    def check_duplicate(self, symbol_name, scope):
+        for symbol in self.symbols:
+            if symbol.name == symbol_name and symbol.scope == scope:
+                raise ValueError(f"Error: Variable duplicada '{symbol_name}' en el scope '{scope}'")
+
+    def add_symbol(self, symbol):
+        self.check_duplicate(symbol.name, symbol.scope)
+        self.symbols.append(symbol)
+
+    def is_declared(self, symbol_name, scope):
+        for symbol in self.symbols:
+            if symbol.name == symbol_name and symbol.scope == scope:
+                return True
+        return False
 
 
 class MyYAPLListener(ParseTreeListener):
@@ -263,39 +365,65 @@ class MyYAPLListener(ParseTreeListener):
         ]
         print(tabulate(self.table, headers=headers))
 
+    def enterVariableAccess(self, ctx):
+        var_name = ctx.OBJECT_ID().getText()
+        if not self.symbol_table.is_declared(var_name, self.current_scope):
+            raise ValueError(f"Error: Uso de variable no declarada '{var_name}'")
+
+
 
 def main(argv):
-    input_stream = FileStream(argv[1])
-    lexer = YAPLLexer(input_stream)
-    stream = CommonTokenStream(lexer)
+    global text_editor
 
-    error_listener = CustomErrorListener()
+    # Inicializar la ventana principal
+    root = tk.Tk()
+    root.title("YAPL Validator GUI")
+    root.geometry("600x400")
 
-    parser = YAPLParser(stream)
-    parser.removeErrorListeners()
-    parser.addErrorListener(error_listener)
+    # Esto abrirá el cuadro de diálogo de selección de archivo tan pronto como se inicie la aplicación
+    select_file(root)  # Añadimos esto aquí
 
-    try:
-        tree = parser.program()
+    menu = tk.Menu(root)
+    root.config(menu=menu)
+    file_menu = tk.Menu(menu)
+    menu.add_cascade(label="File", menu=file_menu)
 
-        if parser.getNumberOfSyntaxErrors() > 0:
-            print("Se detectaron los siguientes errores:")
-            for error in error_listener.error_messages:
-                print(error)
-            print("Finalizando el programa.")
-            return
+    # Agregar acciones al menú File
+    file_menu.add_command(label="Open...", command=select_file)  # Modificamos el comando aquí
 
-        print(Trees.toStringTree(tree, None, parser))
+    root.mainloop()
 
-        plot_tree(parser, tree)
+    # input_stream = FileStream(argv[1])
+    # lexer = YAPLLexer(input_stream)
+    # stream = CommonTokenStream(lexer)
 
-        listener = MyYAPLListener()
-        walker = ParseTreeWalker()
-        walker.walk(listener, tree)
+    # error_listener = CustomErrorListener()
 
-    except Exception as e:
-        print(e)
+    # parser = YAPLParser(stream)
+    # parser.removeErrorListeners()
+    # parser.addErrorListener(error_listener)
 
+    # try:
+    #     tree = parser.program()
 
+    #     if parser.getNumberOfSyntaxErrors() > 0:
+    #         print("Se detectaron los siguientes errores:")
+    #         for error in error_listener.error_messages:
+    #             print(error)
+    #         print("Finalizando el programa.")
+    #         return
+
+    #     print(Trees.toStringTree(tree, None, parser))
+
+    #     plot_tree(parser, tree)
+
+    #     listener = MyYAPLListener()
+    #     walker = ParseTreeWalker()
+    #     walker.walk(listener, tree)
+
+    # except Exception as e:
+    #     print(e)
+
+    
 if __name__ == "__main__":
     main(sys.argv)
