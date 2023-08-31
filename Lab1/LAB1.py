@@ -223,12 +223,13 @@ class Symbol:
         self.pass_method = pass_method
 
 
+
 class SymbolTable:
     def __init__(self):
         self.symbols = []
 
-    # def add_symbol(self, symbol):
-    #     self.symbols.append(symbol)
+    def add_symbol(self, symbol):
+        self.symbols.append(symbol)
 
     def print_table(self):
         for symbol in self.symbols:
@@ -236,33 +237,39 @@ class SymbolTable:
                 f"Name: {symbol.name}, Tipo de Dato: {symbol.type}, Scope: {symbol.scope}, Lexema: {symbol.lexeme}, Token: {symbol.token}, Memory Pos: {symbol.memory_pos}, Line Num: {symbol.line_num}, Line Pos: {symbol.line_pos}, Tipo Semantico: {symbol.semantic_type}, Num Params: {symbol.num_params}, Tipo de Parametros: {symbol.param_types}, Metodo para paso de parámetros: {symbol.pass_method}"
             )
 
-    def check_duplicate(self, symbol_name, scope):
-        for symbol in self.symbols:
-            if symbol.name == symbol_name and symbol.scope == scope:
-                raise ValueError(f"Error: Variable duplicada '{symbol_name}' en el scope '{scope}'")
-
-    def add_symbol(self, symbol):
-        self.check_duplicate(symbol.name, symbol.scope)
-        self.symbols.append(symbol)
-
-    def is_declared(self, symbol_name, scope):
-        for symbol in self.symbols:
-            if symbol.name == symbol_name and symbol.scope == scope:
-                return True
-        return False
+    def symbol_exists(self, name, scope):
+        return any(
+            symbol.name == name and symbol.scope == scope for symbol in self.symbols
+        )
 
 
-class MyYAPLListener(ParseTreeListener):
+class MyYAPLListener(YAPLListener):
     def __init__(self):
         self.symbol_table = SymbolTable()
         self.current_scope = "global"
         self.current_memory_position = 0
         self.table = []
+        self.main_class_found = (
+            False  # Para verificar si se encuentra una clase MainClass
+        )
+        self.main_found = False  # Para verificar si se encuentra una clase Main
+        self.main_method_in_main_class_found = (
+            False  # Para verificar si se encuentra un método mainMethod en MainClass
+        )
+        self.main_method_in_main_found = (
+            False  # Para verificar si se encuentra un método main en Main
+        )
 
     def enterClassDef(self, ctx):
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
         for type_id in type_ids:
             type_id = type_id.getText()
+            class_name = ctx.TYPE_ID()[0].getText()
+            # <-- Verificación aquí: Comprobar si el nombre de la clase es "Main"
+            if class_name == "MainClass":
+                self.main_class_found = True
+            elif class_name == "Main":
+                self.main_found = True
             symbol = Symbol(
                 name=type_id,
                 type="ClassType",
@@ -307,6 +314,11 @@ class MyYAPLListener(ParseTreeListener):
                 param_types=[],
                 pass_method="byValue",
             )
+            if self.symbol_table.symbol_exists(object_id, self.current_scope):
+                print(
+                    f"Error en línea {ctx.start.line}: La variable {object_id} ya ha sido declarada en este ámbito."
+                )
+                return
             self.symbol_table.add_symbol(symbol)
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
@@ -337,7 +349,61 @@ class MyYAPLListener(ParseTreeListener):
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
 
+    def enterMethodDef(self, ctx):
+        method_name = (
+            ctx.method_name.getText()
+        )  # Suponiendo que `method_name` es cómo obtienes el nombre del método en tu gramática
+        return_type = (
+            ctx.return_type.getText()
+        )  # Suponiendo que `return_type` es cómo obtienes el tipo de retorno en tu gramática
+
+        formal_params = []
+        if (
+            ctx.formal_params
+        ):  # Suponiendo que `formal_params` es cómo obtienes los parámetros formales
+            for param in ctx.formal_params:
+                param_type = param.param_type.getText()
+                param_name = param.param_name.getText()
+                formal_params.append((param_type, param_name))
+
+        # Comprobación para MainClass
+        if self.current_scope == "MainClass" and method_name == "mainMethod":
+            self.main_method_in_main_class_found = True
+
+        # Comprobación para Main
+        if self.current_scope == "Main" and method_name == "main":
+            self.main_method_in_main_found = True
+            if len(formal_params) > 0:
+                print(
+                    "Error: el método main en la clase Main no debe tener parámetros."
+                )
+
+        # Agregando el método a la tabla de símbolos
+        symbol = Symbol(
+            name=method_name,
+            type_=return_type,
+            scope=self.current_scope,
+            formal_params=formal_params
+            # Añadir cualquier otro atributo necesario
+        )
+        self.symbol_table.add_symbol(symbol)
+        self.current_memory_position += 1
+        self.table.append(list(symbol.__dict__.values()))
+
+        # Cambiar el alcance actual al método que estamos visitando
+        self.current_scope = f"{self.current_scope}.{method_name}"
+
     def exitProgram(self, ctx):
+
+        if not self.main_class_found and not self.main_found:
+            print("Error: No se ha encontrado ni la clase MainClass ni la clase Main.")
+        elif self.main_class_found and not self.main_method_in_main_class_found:
+            print(
+                "Error: No se ha encontrado el método mainMethod en la clase MainClass."
+            )
+        elif self.main_found and not self.main_method_in_main_found:
+            print("Error: No se ha encontrado el método main en la clase Main.")
+
         headers = [
             "Name",
             "Tipo de Dato",
@@ -353,13 +419,6 @@ class MyYAPLListener(ParseTreeListener):
             "Metodo para paso de parámetros",
         ]
         print(tabulate(self.table, headers=headers))
-
-    def enterVariableAccess(self, ctx):
-        var_name = ctx.OBJECT_ID().getText()
-        if not self.symbol_table.is_declared(var_name, self.current_scope):
-            raise ValueError(f"Error: Uso de variable no declarada '{var_name}'")
-
-
 
 def main(argv):
     global text_editor
