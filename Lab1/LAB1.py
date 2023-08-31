@@ -56,47 +56,36 @@ def validate_content():
 
 def execute_functions():
     global file_path
+    input_stream = FileStream(file_path)
+    lexer = YAPLLexer(input_stream)
+    stream = CommonTokenStream(lexer)
+
+    error_listener = CustomErrorListener()
+
+    parser = YAPLParser(stream)
+    parser.removeErrorListeners()
+    parser.addErrorListener(error_listener)
+
     try:
-        # Aquí debes llamar a tus funciones de análisis sintáctico, creación de tabla de símbolos, y validaciones semánticas
-        # Por ejemplo:
-        # sintactic_analysis_function()
-        # symbol_table_creation_function()
-        # semantic_validations_function()
+        tree = parser.program()
 
-        input_stream = FileStream(file_path)
-        lexer = YAPLLexer(input_stream)
-        stream = CommonTokenStream(lexer)
+        if parser.getNumberOfSyntaxErrors() > 0:
+            print("Se detectaron los siguientes errores:")
+            for error in error_listener.error_messages:
+                print(error)
+            print("Finalizando el programa.")
+            return
 
-        error_listener = CustomErrorListener()
+        #print(Trees.toStringTree(tree, None, parser))
 
-        parser = YAPLParser(stream)
-        parser.removeErrorListeners()
-        parser.addErrorListener(error_listener)
+        plot_tree(parser, tree)
 
-        try:
-            tree = parser.program()
+        listener = MyYAPLListener()
+        walker = ParseTreeWalker()
+        walker.walk(listener, tree)
 
-            if parser.getNumberOfSyntaxErrors() > 0:
-                print("Se detectaron los siguientes errores:")
-                for error in error_listener.error_messages:
-                    print(error)
-                print("Finalizando el programa.")
-                return
-
-            print(Trees.toStringTree(tree, None, parser))
-
-            plot_tree(parser, tree)
-
-            listener = MyYAPLListener()
-            walker = ParseTreeWalker()
-            walker.walk(listener, tree)
-
-        except Exception as e:
-            print(e)
-        
-        print("Todas las funcionalidades se ejecutaron correctamente.")
     except Exception as e:
-        print(f"Error: {e}")
+        print(e)
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):
@@ -392,37 +381,6 @@ def main(argv):
     file_menu.add_command(label="Open...", command=select_file)  # Modificamos el comando aquí
 
     root.mainloop()
-
-    # input_stream = FileStream(argv[1])
-    # lexer = YAPLLexer(input_stream)
-    # stream = CommonTokenStream(lexer)
-
-    # error_listener = CustomErrorListener()
-
-    # parser = YAPLParser(stream)
-    # parser.removeErrorListeners()
-    # parser.addErrorListener(error_listener)
-
-    # try:
-    #     tree = parser.program()
-
-    #     if parser.getNumberOfSyntaxErrors() > 0:
-    #         print("Se detectaron los siguientes errores:")
-    #         for error in error_listener.error_messages:
-    #             print(error)
-    #         print("Finalizando el programa.")
-    #         return
-
-    #     print(Trees.toStringTree(tree, None, parser))
-
-    #     plot_tree(parser, tree)
-
-    #     listener = MyYAPLListener()
-    #     walker = ParseTreeWalker()
-    #     walker.walk(listener, tree)
-
-    # except Exception as e:
-    #     print(e)
 
     
 if __name__ == "__main__":
