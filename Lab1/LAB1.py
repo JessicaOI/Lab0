@@ -28,6 +28,9 @@ def initialize_text_editor(root, content):
     text_editor = Text(root, wrap=tk.WORD)
     text_editor.insert(tk.END, content)
     text_editor.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
+
+    # Asegurarse de que el text_editor esté en estado editable
+    text_editor.configure(state=tk.NORMAL)
 #Se crea en el GUI la ventana que permite al usuario seleccionar un archivo
 def select_file(root):
     global file_path
@@ -41,17 +44,23 @@ def select_file(root):
 
     initialize_text_editor(root, content)  # Inicializar el editor de texto después de seleccionar un archivo
 #Guardar cambios en el archivo abierto en el text editor
-def validate_content():
-    global text_editor, file_path  # Agregamos file_path a las variables globales aquí
-    content = text_editor.get(1.0, tk.END).strip()
-    
-    
-    # Ahora en lugar de escribir en un archivo temporal, escribimos en el archivo seleccionado
-    with open(file_path, "w") as file:
+def save_file():
+    global file_path  # Suponiendo que tienes una variable global que guarda la ruta del archivo actual
+    with open(file_path, 'w') as file:
+        content = text_editor.get(1.0, tk.END)
         file.write(content)
-
-    # Asumiendo que main() es la función que realiza la validación con ANTLR
-    main(file_path)
+#A la hora de cerrar el programa preguntar si se quieren guardar los cambios
+def on_closing(root):
+    # Verifica si el contenido ha sido modificado
+    if text_editor.edit_modified():
+        answer = messagebox.askyesnocancel("Guardar", "¿Desea guardar los cambios antes de salir?")
+        if answer == True:
+            save_file()
+            root.destroy()
+        elif answer == False:
+            root.destroy()
+    else:
+        root.destroy()
 #Se crea la consola del GUI
 def initialize_console(root):
     global console
@@ -448,8 +457,6 @@ def main():
     root.title("YAPL Validator GUI")
     root.geometry("600x800")
     
-    # Esto abrirá el cuadro de diálogo de selección de archivo tan pronto como se inicie la aplicación
-    select_file(root)  # Añadimos esto aquí
 
     #Agregar consola interna
     initialize_console(root)
@@ -458,14 +465,24 @@ def main():
 
     menu = tk.Menu(root)
     root.config(menu=menu)
+
+    #Creando menu de acciones
     file_menu = tk.Menu(menu)
     menu.add_cascade(label="File", menu=file_menu)
 
-    # Agregar acciones al menú File
-    file_menu.add_command(label="Open...", command=select_file)  # Modificamos el comando aquí
+    #Agregar acciones al menú File
+    #Seleccionar un archivo
+    file_menu.add_command(label="Open...", command=lambda: select_file(root))  
+    #Guardar el archivo
+    file_menu.add_command(label="Guardar", command=save_file)
+    # file_menu.add_command(label="Guardar como...", command=save_as)
 
+    #Si hay cambios guardar al cerrar pestaña
+    root.protocol("WM_DELETE_WINDOW", lambda: on_closing(root))
     #Se mantendra corriendo hasta que se cierre la ventana
     root.mainloop()
+    
+
 
 
     
