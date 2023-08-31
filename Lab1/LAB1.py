@@ -4,6 +4,7 @@ from antlr4 import *
 from antlr4.tree.Trees import Trees
 from YAPLLexer import YAPLLexer
 from YAPLParser import YAPLParser
+from YAPLListener import YAPLListener
 from antlr4.error.ErrorListener import ErrorListener
 from anytree import Node, RenderTree
 from anytree.exporter import DotExporter
