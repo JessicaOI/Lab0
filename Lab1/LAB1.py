@@ -13,8 +13,10 @@ from tabulate import tabulate
 import tkinter as tk
 from tkinter import filedialog, messagebox, Text, simpledialog
 
+#---------------------GUI------------------------------------------------------------
 text_editor = None
-
+console = None
+#Se crear el el GUI el espacio del editor de texto
 def initialize_text_editor(root, content):
     global text_editor
 
@@ -26,10 +28,7 @@ def initialize_text_editor(root, content):
     text_editor = Text(root, wrap=tk.WORD)
     text_editor.insert(tk.END, content)
     text_editor.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
-
-
-
-
+#Se crea en el GUI la ventana que permite al usuario seleccionar un archivo
 def select_file(root):
     global file_path
     file_path = filedialog.askopenfilename()
@@ -41,8 +40,7 @@ def select_file(root):
         content = file.read()
 
     initialize_text_editor(root, content)  # Inicializar el editor de texto después de seleccionar un archivo
-
-
+#Guardar cambios en el archivo abierto en el text editor
 def validate_content():
     global text_editor, file_path  # Agregamos file_path a las variables globales aquí
     content = text_editor.get(1.0, tk.END).strip()
@@ -54,7 +52,24 @@ def validate_content():
 
     # Asumiendo que main() es la función que realiza la validación con ANTLR
     main(file_path)
+#Se crea la consola del GUI
+def initialize_console(root):
+    global console
+    console = tk.Text(root, bg="black", fg="white", wrap=tk.WORD)
+    console.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
+#Redirigir lo que normalmente se imprime en la consola de visual al programa con GUI
+class IOWrapper:
+    def __init__(self, widget):
+        self.widget = widget
 
+    def write(self, text):
+        self.widget.insert(tk.END, text)
+        self.widget.see(tk.END)  # Auto-scroll
+
+    def flush(self):
+        pass
+
+#Al presionar el boton se ejecuta el programa en el GUI
 def execute_functions():
     global file_path
     input_stream = FileStream(file_path)
@@ -87,7 +102,7 @@ def execute_functions():
 
     except Exception as e:
         print(e)
-
+#-------------------------------------Fin GUI------------------------------------
 class CustomErrorListener(ErrorListener):
     def __init__(self):
         super().__init__()
@@ -174,8 +189,10 @@ def plot_tree(parser, tree):
         return any_node
 
     root = build_node(tree)
-    for pre, fill, node in RenderTree(root):
-        print("%s%s" % (pre, node.displayed_label))
+
+    #---------Imprimir Arbol de analisis sintactico-------
+    # for pre, fill, node in RenderTree(root):
+    #     print("%s%s" % (pre, node.displayed_label))
 
     DotExporter(
         root,
@@ -419,18 +436,25 @@ class MyYAPLListener(YAPLListener):
             "Tipo de Parametros",
             "Metodo para paso de parámetros",
         ]
-        print(tabulate(self.table, headers=headers))
 
-def main(argv):
+        #--------Imprimir tabla de simbolos--------
+        #print(tabulate(self.table, headers=headers))
+
+def main():
     global text_editor
 
     # Inicializar la ventana principal
     root = tk.Tk()
     root.title("YAPL Validator GUI")
-    root.geometry("600x400")
-
+    root.geometry("600x800")
+    
     # Esto abrirá el cuadro de diálogo de selección de archivo tan pronto como se inicie la aplicación
     select_file(root)  # Añadimos esto aquí
+
+    #Agregar consola interna
+    initialize_console(root)
+    sys.stdout = IOWrapper(console)
+    sys.stderr = IOWrapper(console)
 
     menu = tk.Menu(root)
     root.config(menu=menu)
@@ -440,8 +464,10 @@ def main(argv):
     # Agregar acciones al menú File
     file_menu.add_command(label="Open...", command=select_file)  # Modificamos el comando aquí
 
+    #Se mantendra corriendo hasta que se cierre la ventana
     root.mainloop()
+
 
     
 if __name__ == "__main__":
-    main(sys.argv)
+    main()
