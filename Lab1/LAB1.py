@@ -10,6 +10,7 @@ from anytree import Node, RenderTree
 from anytree.exporter import DotExporter
 import re
 from tabulate import tabulate
+from copy import deepcopy
 import tkinter as tk
 from tkinter import filedialog, messagebox, Text, simpledialog
 
@@ -262,6 +263,7 @@ class Symbol:
 class SymbolTable:
     def __init__(self):
         self.symbols = []
+        self.class_inheritance = {}  # Este diccionario mapeará una clase a su clase base, si es que hereda de alguna.
 
     def add_symbol(self, symbol):
         self.symbols.append(symbol)
@@ -276,6 +278,22 @@ class SymbolTable:
         return any(
             symbol.name == name and symbol.scope == scope for symbol in self.symbols
         )
+    
+    def add_inheritance(self, derived, base):
+        self.class_inheritance[derived] = base
+
+    def symbol_exists_with_inheritance(self, name, scope):
+        # Verifica primero en el alcance dado
+        if any(symbol.name == name and symbol.scope == scope for symbol in self.symbols):
+            return True
+
+        # Verifica en clases base (si existen)
+        while scope in self.class_inheritance:
+            scope = self.class_inheritance[scope]
+            if any(symbol.name == name and symbol.scope == scope for symbol in self.symbols):
+                return True
+
+        return False
     
 #-------------------------Fin declaraciones tabla de simbolos------------------------------------------
 
@@ -331,19 +349,20 @@ class MyYAPLListener(YAPLListener):
             self.table.append(list(symbol.__dict__.values()))
         self.current_scope = type_ids[0].getText()
 
+        class_name2 = ctx.TYPE_ID()[0].getText()
         # Si la clase tiene una clase padre (por la presencia de INHERITS)
         if ctx.INHERITS():
-            # Obtener el nombre de la clase padre
             parent_class_name = ctx.TYPE_ID(1).getText()
             
-            # Verificar si ese nombre corresponde a uno de los tipos básicos
-            if parent_class_name in self.basic_types:
-                # Lanzar un error
-                line = ctx.start.line
-                column = ctx.start.column
-                error_msg = f"Linea {line}:{column} Error: El tipo {parent_class_name} no puede ser usado como clase padre."
-                #print(error_msg)
-                self.semantic_errors.append(error_msg)
+            # Añadir las variables y métodos de la clase base al alcance actual
+            for symbol in self.symbol_table.symbols:
+                if symbol.scope == parent_class_name:
+                    inherited_symbol = deepcopy(symbol)
+                    inherited_symbol.scope = class_name2
+                    self.symbol_table.add_symbol(inherited_symbol)
+
+            # Añadir la relación de herencia
+            self.symbol_table.add_inheritance(class_name2, parent_class_name)
 
     def exitClassDef(self, ctx):
         self.current_scope = "global"
