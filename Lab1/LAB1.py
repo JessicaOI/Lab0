@@ -91,27 +91,33 @@ def execute_functions():
     parser.removeErrorListeners()
     parser.addErrorListener(error_listener)
 
-    try:
-        tree = parser.program()
+    tree = parser.program()  # Esto creará un árbol incluso si hay errores sintácticos.
 
-        if parser.getNumberOfSyntaxErrors() > 0:
-            print("Se detectaron los siguientes errores:")
-            for error in error_listener.error_messages:
-                print(error)
-            print("Finalizando el programa.")
-            return
+    #print(Trees.toStringTree(tree, None, parser))
 
-        #print(Trees.toStringTree(tree, None, parser))
+    plot_tree(parser, tree)
 
-        plot_tree(parser, tree)
+    # Camina por el árbol incluso si hay errores sintácticos
+    listener = MyYAPLListener()
+    walker = ParseTreeWalker()
+    walker.walk(listener, tree)
 
-        listener = MyYAPLListener()
-        walker = ParseTreeWalker()
-        walker.walk(listener, tree)
+    # Ahora, al final, verifica e imprime todos los errores detectados
+    if parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0:  # Asumiendo que `semantic_errors` es una lista en tu listener
+        print("Se detectaron los siguientes errores:")
 
-    except Exception as e:
-        print(e)
+        for error in error_listener.error_messages:
+            print("Error Sintáctico: " + error)
+        
+        for error in listener.semantic_errors:
+            print("Error Semántico: " + error)
+
+        print("Finalizando el programa.")
+
 #-------------------------------------Fin GUI------------------------------------
+
+#----------------------Analisis sintanctico--------------------------------------
+#Mensajes de error personalizados
 class CustomErrorListener(ErrorListener):
     def __init__(self):
         super().__init__()
@@ -164,7 +170,7 @@ class CustomErrorListener(ErrorListener):
 
         self.error_messages.add(error_msg)
 
-
+#Arbol
 def plot_tree(parser, tree):
     def build_node(node, parent=None):
         node_type = type(node).__name__
@@ -219,7 +225,9 @@ def plot_tree(parser, tree):
 
     os.system("dot -Tpng tree.dot -o tree.png")
 
+#----------------------Fin analisis sintanctico--------------------------------------
 
+#-------------------------Declaraciones Tabla de simbolos----------------------------
 class Symbol:
     def __init__(
         self,
@@ -268,8 +276,10 @@ class SymbolTable:
         return any(
             symbol.name == name and symbol.scope == scope for symbol in self.symbols
         )
+    
+#-------------------------Fin declaraciones tabla de simbolos------------------------------------------
 
-
+#-------------------------Analisis Semantico---------------------------------------------
 class MyYAPLListener(YAPLListener):
     def __init__(self):
         self.symbol_table = SymbolTable()
@@ -286,6 +296,10 @@ class MyYAPLListener(YAPLListener):
         self.main_method_in_main_found = (
             False  # Para verificar si se encuentra un método main en Main
         )
+        #Almacenar todos los errores semanticos
+        self.semantic_errors = []
+        #Regla-Tipos de datos: Tipos basicos
+        self.basic_types = {"Int", "String", "Bool"}
 
     def enterClassDef(self, ctx):
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
@@ -296,7 +310,8 @@ class MyYAPLListener(YAPLListener):
             if class_name == "MainClass":
                 self.main_class_found = True
             elif class_name == "Main":
-                self.main_found = True
+                self.main_found = True                
+
             symbol = Symbol(
                 name=type_id,
                 type="ClassType",
@@ -315,6 +330,20 @@ class MyYAPLListener(YAPLListener):
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
         self.current_scope = type_ids[0].getText()
+
+        # Si la clase tiene una clase padre (por la presencia de INHERITS)
+        if ctx.INHERITS():
+            # Obtener el nombre de la clase padre
+            parent_class_name = ctx.TYPE_ID(1).getText()
+            
+            # Verificar si ese nombre corresponde a uno de los tipos básicos
+            if parent_class_name in self.basic_types:
+                # Lanzar un error
+                line = ctx.start.line
+                column = ctx.start.column
+                error_msg = f"Linea {line}:{column} Error: El tipo {parent_class_name} no puede ser usado como clase padre."
+                #print(error_msg)
+                self.semantic_errors.append(error_msg)
 
     def exitClassDef(self, ctx):
         self.current_scope = "global"
@@ -342,13 +371,42 @@ class MyYAPLListener(YAPLListener):
                 pass_method="byValue",
             )
             if self.symbol_table.symbol_exists(object_id, self.current_scope):
-                print(
+                self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: La variable {object_id} ya ha sido declarada en este ámbito."
                 )
                 return
             self.symbol_table.add_symbol(symbol)
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
+        # Verificación para asegurarse de que cualquier atributo utilizado ha sido declarado
+        for object_id in object_ids:
+            object_id = object_id.getText()
+            if not self.symbol_table.symbol_exists(object_id, self.current_scope):
+                self.semantic_errors.append(f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración.")
+                return
+            
+    def enterExpression(self, ctx:YAPLParser.ExpressionContext):
+        # Comprueba operaciones binarias, que tendrían tres hijos (e.g., expression '+' expression)
+        if ctx.getChildCount() == 3:
+            left_operand = ctx.getChild(0)
+            operator = ctx.getChild(1).getText()
+            right_operand = ctx.getChild(2)
+            operands = [left_operand, right_operand]
+
+            for operand in operands:
+                # Aquí asumimos que cada operand es otra ExpressionContext y tiene un método OBJECT_ID()
+                object_id = operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
+                if object_id and not self.symbol_table.symbol_exists(object_id, self.current_scope):
+                    self.semantic_errors.append(f"Error en línea {operand.start.line}: Uso del atributo {object_id} antes de su declaración.")
+                    return
+        else:
+            # Manejo para otras expresiones (no binarias)
+            object_id = ctx.OBJECT_ID().getText() if ctx.OBJECT_ID() else None
+            if object_id and not self.symbol_table.symbol_exists(object_id, self.current_scope):
+                self.semantic_errors.append(f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración.")
+                return
+
+
 
     def enterFormal(self, ctx):
         object_ids = (
@@ -401,7 +459,7 @@ class MyYAPLListener(YAPLListener):
         if self.current_scope == "Main" and method_name == "main":
             self.main_method_in_main_found = True
             if len(formal_params) > 0:
-                print(
+                self.semantic_errors.append(
                     "Error: el método main en la clase Main no debe tener parámetros."
                 )
 
@@ -423,13 +481,13 @@ class MyYAPLListener(YAPLListener):
     def exitProgram(self, ctx):
 
         if not self.main_class_found and not self.main_found:
-            print("Error: No se ha encontrado ni la clase MainClass ni la clase Main.")
+            self.semantic_errors.append("Error: No se ha encontrado ni la clase MainClass ni la clase Main.")
         elif self.main_class_found and not self.main_method_in_main_class_found:
-            print(
+            self.semantic_errors.append(
                 "Error: No se ha encontrado el método mainMethod en la clase MainClass."
             )
         elif self.main_found and not self.main_method_in_main_found:
-            print("Error: No se ha encontrado el método main en la clase Main.")
+            self.semantic_errors.append("Error: No se ha encontrado el método main en la clase Main.")
 
         headers = [
             "Name",
@@ -448,10 +506,10 @@ class MyYAPLListener(YAPLListener):
 
         #--------Imprimir tabla de simbolos--------
         #print(tabulate(self.table, headers=headers))
-
+#-------------------------Analisis Semantico---------------------------------------------
 def main():
     global text_editor
-
+    
     # Inicializar la ventana principal
     root = tk.Tk()
     root.title("YAPL Validator GUI")
@@ -481,10 +539,6 @@ def main():
     root.protocol("WM_DELETE_WINDOW", lambda: on_closing(root))
     #Se mantendra corriendo hasta que se cierre la ventana
     root.mainloop()
-    
-
-
-
     
 if __name__ == "__main__":
     main()
