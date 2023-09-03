@@ -1,18 +1,16 @@
 class Main {
     var1: Int;
-    var2: String;
     main(): Int {
-        if var1 then
-            var2 <- "true branch";
-        else
-            var2 <- "false branch";
+        if var2 then 
+            var1 <- 0;
         fi;
         return 0;
     };
+    var2: Bool;
 };
 
-class SecondClass inherits Main {
-    var3: Bool;
+
+class SecondClass {
     secondMethod(): Int {
         while var3 loop
             var1 <- var1 + 1;
@@ -20,4 +18,6 @@ class SecondClass inherits Main {
         return var1;
     };
 };
+
+
 

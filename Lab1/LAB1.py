@@ -431,6 +431,15 @@ class MyYAPLListener(YAPLListener):
         for object_id, type_id in zip(object_ids, type_ids):
             object_id = object_id.getText()
             type_id = type_id.getText()
+
+            if self.symbol_table.symbol_exists_with_inheritance(
+                object_id, self.current_scope
+            ):
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: La variable o método {object_id} no puede ser sobrescrito en la clase hija."
+                )
+                return
+
             symbol = Symbol(
                 name=object_id,
                 type="Feature",
@@ -492,6 +501,23 @@ class MyYAPLListener(YAPLListener):
                     f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración."
                 )
                 return
+
+    def enterExpressionStatement(self, ctx):
+        object_id = (
+            ctx.OBJECT_ID().getText()
+        )  # Obtén el identificador a la izquierda del operador de asignación
+        expression = (
+            ctx.expression()
+        )  # Suponiendo que `expression` es cómo obtienes la expresión a la derecha del operador de asignación
+
+        # Verifica si el identificador ha sido declarado
+        if not self.symbol_table.symbol_exists(object_id, self.current_scope):
+            self.semantic_errors.append(
+                f"Error en línea {ctx.start.line}: Uso de la variable {object_id} antes de su declaración."
+            )
+            return
+
+        # Aquí también puedes hacer verificaciones adicionales relacionadas con la compatibilidad de tipos entre el identificador y la expresión.
 
     def enterFormal(self, ctx):
         object_ids = (
