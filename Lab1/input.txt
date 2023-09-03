@@ -1,7 +1,7 @@
-class MainClass {
+class Main {
     var1: Int;
     var2: String;
-    mainMethod(arg1: Int, arg2: String): Int {
+    main(): Int {
         if var1 then
             var2 <- "true branch";
         else
@@ -10,7 +10,8 @@ class MainClass {
         return 0;
     };
 };
-class SecondClass inherits MainClass {
+
+class SecondClass inherits Main {
     var3: Bool;
     secondMethod(): Int {
         while var3 loop
@@ -19,3 +20,4 @@ class SecondClass inherits MainClass {
         return var1;
     };
 };
+

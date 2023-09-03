@@ -14,15 +14,17 @@ from copy import deepcopy
 import tkinter as tk
 from tkinter import filedialog, messagebox, Text, simpledialog
 
-#---------------------GUI------------------------------------------------------------
+# ---------------------GUI------------------------------------------------------------
 text_editor = None
 console = None
-#Se crear el el GUI el espacio del editor de texto
+# Se crear el el GUI el espacio del editor de texto
 def initialize_text_editor(root, content):
     global text_editor
 
     # Crear el botón y agregarlo a la interfaz
-    execute_button = tk.Button(root, text="Ejecutar Validaciones", command=execute_functions)
+    execute_button = tk.Button(
+        root, text="Ejecutar Validaciones", command=execute_functions
+    )
     execute_button.pack(pady=10)
 
     # Crear el editor de texto y llenarlo con el contenido del archivo
@@ -32,29 +34,39 @@ def initialize_text_editor(root, content):
 
     # Asegurarse de que el text_editor esté en estado editable
     text_editor.configure(state=tk.NORMAL)
-#Se crea en el GUI la ventana que permite al usuario seleccionar un archivo
+
+
+# Se crea en el GUI la ventana que permite al usuario seleccionar un archivo
 def select_file(root):
     global file_path
     file_path = filedialog.askopenfilename()
-    
+
     if not file_path:
         return
 
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         content = file.read()
 
-    initialize_text_editor(root, content)  # Inicializar el editor de texto después de seleccionar un archivo
-#Guardar cambios en el archivo abierto en el text editor
+    initialize_text_editor(
+        root, content
+    )  # Inicializar el editor de texto después de seleccionar un archivo
+
+
+# Guardar cambios en el archivo abierto en el text editor
 def save_file():
     global file_path  # Suponiendo que tienes una variable global que guarda la ruta del archivo actual
-    with open(file_path, 'w') as file:
+    with open(file_path, "w") as file:
         content = text_editor.get(1.0, tk.END)
         file.write(content)
-#A la hora de cerrar el programa preguntar si se quieren guardar los cambios
+
+
+# A la hora de cerrar el programa preguntar si se quieren guardar los cambios
 def on_closing(root):
     # Verifica si el contenido ha sido modificado
     if text_editor.edit_modified():
-        answer = messagebox.askyesnocancel("Guardar", "¿Desea guardar los cambios antes de salir?")
+        answer = messagebox.askyesnocancel(
+            "Guardar", "¿Desea guardar los cambios antes de salir?"
+        )
         if answer == True:
             save_file()
             root.destroy()
@@ -62,12 +74,16 @@ def on_closing(root):
             root.destroy()
     else:
         root.destroy()
-#Se crea la consola del GUI
+
+
+# Se crea la consola del GUI
 def initialize_console(root):
     global console
     console = tk.Text(root, bg="black", fg="white", wrap=tk.WORD)
     console.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
-#Redirigir lo que normalmente se imprime en la consola de visual al programa con GUI
+
+
+# Redirigir lo que normalmente se imprime en la consola de visual al programa con GUI
 class IOWrapper:
     def __init__(self, widget):
         self.widget = widget
@@ -79,7 +95,8 @@ class IOWrapper:
     def flush(self):
         pass
 
-#Al presionar el boton se ejecuta el programa en el GUI
+
+# Al presionar el boton se ejecuta el programa en el GUI
 def execute_functions():
     global file_path
     input_stream = FileStream(file_path)
@@ -94,7 +111,7 @@ def execute_functions():
 
     tree = parser.program()  # Esto creará un árbol incluso si hay errores sintácticos.
 
-    #print(Trees.toStringTree(tree, None, parser))
+    # print(Trees.toStringTree(tree, None, parser))
 
     plot_tree(parser, tree)
 
@@ -104,21 +121,24 @@ def execute_functions():
     walker.walk(listener, tree)
 
     # Ahora, al final, verifica e imprime todos los errores detectados
-    if parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0:  # Asumiendo que `semantic_errors` es una lista en tu listener
+    if (
+        parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0
+    ):  # Asumiendo que `semantic_errors` es una lista en tu listener
         print("Se detectaron los siguientes errores:")
 
         for error in error_listener.error_messages:
             print("Error Sintáctico: " + error)
-        
+
         for error in listener.semantic_errors:
             print("Error Semántico: " + error)
 
         print("Finalizando el programa.")
 
-#-------------------------------------Fin GUI------------------------------------
 
-#----------------------Analisis sintanctico--------------------------------------
-#Mensajes de error personalizados
+# -------------------------------------Fin GUI------------------------------------
+
+# ----------------------Analisis sintanctico--------------------------------------
+# Mensajes de error personalizados
 class CustomErrorListener(ErrorListener):
     def __init__(self):
         super().__init__()
@@ -171,7 +191,8 @@ class CustomErrorListener(ErrorListener):
 
         self.error_messages.add(error_msg)
 
-#Arbol
+
+# Arbol
 def plot_tree(parser, tree):
     def build_node(node, parent=None):
         node_type = type(node).__name__
@@ -206,7 +227,7 @@ def plot_tree(parser, tree):
 
     root = build_node(tree)
 
-    #---------Imprimir Arbol de analisis sintactico-------
+    # ---------Imprimir Arbol de analisis sintactico-------
     # for pre, fill, node in RenderTree(root):
     #     print("%s%s" % (pre, node.displayed_label))
 
@@ -226,9 +247,10 @@ def plot_tree(parser, tree):
 
     os.system("dot -Tpng tree.dot -o tree.png")
 
-#----------------------Fin analisis sintanctico--------------------------------------
 
-#-------------------------Declaraciones Tabla de simbolos----------------------------
+# ----------------------Fin analisis sintanctico--------------------------------------
+
+# -------------------------Declaraciones Tabla de simbolos----------------------------
 class Symbol:
     def __init__(
         self,
@@ -259,11 +281,12 @@ class Symbol:
         self.pass_method = pass_method
 
 
-
 class SymbolTable:
     def __init__(self):
         self.symbols = []
-        self.class_inheritance = {}  # Este diccionario mapeará una clase a su clase base, si es que hereda de alguna.
+        self.class_inheritance = (
+            {}
+        )  # Este diccionario mapeará una clase a su clase base, si es que hereda de alguna.
 
     def add_symbol(self, symbol):
         self.symbols.append(symbol)
@@ -278,26 +301,31 @@ class SymbolTable:
         return any(
             symbol.name == name and symbol.scope == scope for symbol in self.symbols
         )
-    
+
     def add_inheritance(self, derived, base):
         self.class_inheritance[derived] = base
 
     def symbol_exists_with_inheritance(self, name, scope):
         # Verifica primero en el alcance dado
-        if any(symbol.name == name and symbol.scope == scope for symbol in self.symbols):
+        if any(
+            symbol.name == name and symbol.scope == scope for symbol in self.symbols
+        ):
             return True
 
         # Verifica en clases base (si existen)
         while scope in self.class_inheritance:
             scope = self.class_inheritance[scope]
-            if any(symbol.name == name and symbol.scope == scope for symbol in self.symbols):
+            if any(
+                symbol.name == name and symbol.scope == scope for symbol in self.symbols
+            ):
                 return True
 
         return False
-    
-#-------------------------Fin declaraciones tabla de simbolos------------------------------------------
 
-#-------------------------Analisis Semantico---------------------------------------------
+
+# -------------------------Fin declaraciones tabla de simbolos------------------------------------------
+
+# -------------------------Analisis Semantico---------------------------------------------
 class MyYAPLListener(YAPLListener):
     def __init__(self):
         self.symbol_table = SymbolTable()
@@ -314,21 +342,30 @@ class MyYAPLListener(YAPLListener):
         self.main_method_in_main_found = (
             False  # Para verificar si se encuentra un método main en Main
         )
-        #Almacenar todos los errores semanticos
+        # Almacenar todos los errores semanticos
         self.semantic_errors = []
-        #Regla-Tipos de datos: Tipos basicos
+        # Regla-Tipos de datos: Tipos basicos
         self.basic_types = {"Int", "String", "Bool"}
+        self.has_class = False
+        self.has_attribute = False
+        self.has_method = False
 
     def enterClassDef(self, ctx):
+        self.has_class = True
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
         for type_id in type_ids:
             type_id = type_id.getText()
             class_name = ctx.TYPE_ID()[0].getText()
-            # <-- Verificación aquí: Comprobar si el nombre de la clase es "Main"
-            if class_name == "MainClass":
-                self.main_class_found = True
-            elif class_name == "Main":
-                self.main_found = True                
+            self.current_scope = class_name
+            if class_name == "Main":
+                if ctx.INHERITS():  # Verifica si hay una cláusula INHERITS
+                    parent_class_name = ctx.TYPE_ID(
+                        1
+                    ).getText()  # Nombre de la clase padre
+                    self.semantic_errors.append(
+                        f"Error en línea {ctx.start.line}: La clase Main no puede heredar de {parent_class_name}."
+                    )
+                self.main_found = True
 
             symbol = Symbol(
                 name=type_id,
@@ -353,7 +390,7 @@ class MyYAPLListener(YAPLListener):
         # Si la clase tiene una clase padre (por la presencia de INHERITS)
         if ctx.INHERITS():
             parent_class_name = ctx.TYPE_ID(1).getText()
-            
+
             # Añadir las variables y métodos de la clase base al alcance actual
             for symbol in self.symbol_table.symbols:
                 if symbol.scope == parent_class_name:
@@ -368,10 +405,29 @@ class MyYAPLListener(YAPLListener):
         self.current_scope = "global"
 
     def enterFeature(self, ctx):
+        self.has_attribute = True
         object_ids = (
             ctx.OBJECT_ID() if isinstance(ctx.OBJECT_ID(), list) else [ctx.OBJECT_ID()]
         )
+
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
+
+        method_name = object_ids[0].getText() if object_ids else None
+
+        class_name = self.current_scope
+
+        if class_name == "Main" and method_name == "main":
+            self.main_method_in_main_found = (
+                True  # Indicar que main se ha encontrado, sin importar los parámetros
+            )
+            formals = (
+                ctx.formals()
+            )  # Suponiendo que 'formals' es cómo obtienes los parámetros formales
+            if formals:
+                self.semantic_errors.append(
+                    "Error: el método main en la clase Main no debe tener parámetros."
+                )
+
         for object_id, type_id in zip(object_ids, type_ids):
             object_id = object_id.getText()
             type_id = type_id.getText()
@@ -401,10 +457,12 @@ class MyYAPLListener(YAPLListener):
         for object_id in object_ids:
             object_id = object_id.getText()
             if not self.symbol_table.symbol_exists(object_id, self.current_scope):
-                self.semantic_errors.append(f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración.")
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración."
+                )
                 return
-            
-    def enterExpression(self, ctx:YAPLParser.ExpressionContext):
+
+    def enterExpression(self, ctx: YAPLParser.ExpressionContext):
         # Comprueba operaciones binarias, que tendrían tres hijos (e.g., expression '+' expression)
         if ctx.getChildCount() == 3:
             left_operand = ctx.getChild(0)
@@ -414,18 +472,26 @@ class MyYAPLListener(YAPLListener):
 
             for operand in operands:
                 # Aquí asumimos que cada operand es otra ExpressionContext y tiene un método OBJECT_ID()
-                object_id = operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
-                if object_id and not self.symbol_table.symbol_exists(object_id, self.current_scope):
-                    self.semantic_errors.append(f"Error en línea {operand.start.line}: Uso del atributo {object_id} antes de su declaración.")
+                object_id = (
+                    operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
+                )
+                if object_id and not self.symbol_table.symbol_exists(
+                    object_id, self.current_scope
+                ):
+                    self.semantic_errors.append(
+                        f"Error en línea {operand.start.line}: Uso del atributo {object_id} antes de su declaración."
+                    )
                     return
         else:
             # Manejo para otras expresiones (no binarias)
             object_id = ctx.OBJECT_ID().getText() if ctx.OBJECT_ID() else None
-            if object_id and not self.symbol_table.symbol_exists(object_id, self.current_scope):
-                self.semantic_errors.append(f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración.")
+            if object_id and not self.symbol_table.symbol_exists(
+                object_id, self.current_scope
+            ):
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración."
+                )
                 return
-
-
 
     def enterFormal(self, ctx):
         object_ids = (
@@ -453,60 +519,19 @@ class MyYAPLListener(YAPLListener):
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
 
-    def enterMethodDef(self, ctx):
-        method_name = (
-            ctx.method_name.getText()
-        )  # Suponiendo que `method_name` es cómo obtienes el nombre del método en tu gramática
-        return_type = (
-            ctx.return_type.getText()
-        )  # Suponiendo que `return_type` es cómo obtienes el tipo de retorno en tu gramática
-
-        formal_params = []
-        if (
-            ctx.formal_params
-        ):  # Suponiendo que `formal_params` es cómo obtienes los parámetros formales
-            for param in ctx.formal_params:
-                param_type = param.param_type.getText()
-                param_name = param.param_name.getText()
-                formal_params.append((param_type, param_name))
-
-        # Comprobación para MainClass
-        if self.current_scope == "MainClass" and method_name == "mainMethod":
-            self.main_method_in_main_class_found = True
-
-        # Comprobación para Main
-        if self.current_scope == "Main" and method_name == "main":
-            self.main_method_in_main_found = True
-            if len(formal_params) > 0:
-                self.semantic_errors.append(
-                    "Error: el método main en la clase Main no debe tener parámetros."
-                )
-
-        # Agregando el método a la tabla de símbolos
-        symbol = Symbol(
-            name=method_name,
-            type_=return_type,
-            scope=self.current_scope,
-            formal_params=formal_params
-            # Añadir cualquier otro atributo necesario
-        )
-        self.symbol_table.add_symbol(symbol)
-        self.current_memory_position += 1
-        self.table.append(list(symbol.__dict__.values()))
-
-        # Cambiar el alcance actual al método que estamos visitando
-        self.current_scope = f"{self.current_scope}.{method_name}"
-
     def exitProgram(self, ctx):
 
-        if not self.main_class_found and not self.main_found:
-            self.semantic_errors.append("Error: No se ha encontrado ni la clase MainClass ni la clase Main.")
-        elif self.main_class_found and not self.main_method_in_main_class_found:
-            self.semantic_errors.append(
-                "Error: No se ha encontrado el método mainMethod en la clase MainClass."
-            )
+        if not self.main_found:
+            self.semantic_errors.append("Error: No se ha encontrado la clase Main.")
         elif self.main_found and not self.main_method_in_main_found:
-            self.semantic_errors.append("Error: No se ha encontrado el método main en la clase Main.")
+            self.semantic_errors.append(
+                "Error: No se ha encontrado el método main en la clase Main."
+            )
+
+        if not (self.has_class and self.has_attribute):
+            self.semantic_errors.append(
+                "Error: Un programa en YAPL debe tener al menos una definición de clase con atributos y métodos."
+            )
 
         headers = [
             "Name",
@@ -523,19 +548,20 @@ class MyYAPLListener(YAPLListener):
             "Metodo para paso de parámetros",
         ]
 
-        #--------Imprimir tabla de simbolos--------
-        #print(tabulate(self.table, headers=headers))
-#-------------------------Analisis Semantico---------------------------------------------
+        # --------Imprimir tabla de simbolos--------
+        # print(tabulate(self.table, headers=headers))
+
+
+# -------------------------Analisis Semantico---------------------------------------------
 def main():
     global text_editor
-    
+
     # Inicializar la ventana principal
     root = tk.Tk()
     root.title("YAPL Validator GUI")
     root.geometry("600x800")
-    
 
-    #Agregar consola interna
+    # Agregar consola interna
     initialize_console(root)
     sys.stdout = IOWrapper(console)
     sys.stderr = IOWrapper(console)
@@ -543,21 +569,22 @@ def main():
     menu = tk.Menu(root)
     root.config(menu=menu)
 
-    #Creando menu de acciones
+    # Creando menu de acciones
     file_menu = tk.Menu(menu)
     menu.add_cascade(label="File", menu=file_menu)
 
-    #Agregar acciones al menú File
-    #Seleccionar un archivo
-    file_menu.add_command(label="Open...", command=lambda: select_file(root))  
-    #Guardar el archivo
+    # Agregar acciones al menú File
+    # Seleccionar un archivo
+    file_menu.add_command(label="Open...", command=lambda: select_file(root))
+    # Guardar el archivo
     file_menu.add_command(label="Guardar", command=save_file)
     # file_menu.add_command(label="Guardar como...", command=save_as)
 
-    #Si hay cambios guardar al cerrar pestaña
+    # Si hay cambios guardar al cerrar pestaña
     root.protocol("WM_DELETE_WINDOW", lambda: on_closing(root))
-    #Se mantendra corriendo hasta que se cierre la ventana
+    # Se mantendra corriendo hasta que se cierre la ventana
     root.mainloop()
-    
+
+
 if __name__ == "__main__":
     main()
