@@ -322,6 +322,27 @@ class SymbolTable:
 
         return False
 
+    def get_symbol(self, name, scope):
+        for symbol in self.symbols:
+            if symbol.name == name and symbol.scope == scope:
+                return symbol
+        return None  # Retorna None si no se encuentra el símbolo
+
+    def get_symbol_with_inheritance(self, name, scope):
+        # Verifica primero en el alcance dado
+        for symbol in self.symbols:
+            if symbol.name == name and symbol.scope == scope:
+                return symbol
+
+        # Verifica en clases base (si existen)
+        while scope in self.class_inheritance:
+            scope = self.class_inheritance[scope]
+            for symbol in self.symbols:
+                if symbol.name == name and symbol.scope == scope:
+                    return symbol
+
+        return None  # Retorna None si no se encuentra el símbolo
+
 
 # -------------------------Fin declaraciones tabla de simbolos------------------------------------------
 
@@ -517,7 +538,30 @@ class MyYAPLListener(YAPLListener):
             )
             return
 
+        symbol = self.symbol_table.get_symbol(object_id, self.current_scope)
+        id_semantic_type = symbol.semantic_type
+
+        expr_semantic_type = self.get_expression_type(expression)
+
+        # Verificar la compatibilidad de tipos
+        if id_semantic_type != expr_semantic_type:
+            self.semantic_errors.append(
+                f"Error en línea {ctx.start.line}: Incompatibilidad de tipos. No se puede asignar un valor de tipo {expr_semantic_type} a una variable de tipo {id_semantic_type}."
+            )
+
         # Aquí también puedes hacer verificaciones adicionales relacionadas con la compatibilidad de tipos entre el identificador y la expresión.
+
+    # Método auxiliar para obtener el tipo semántico de una expresión (esto es solo un ejemplo simplificado)
+    def get_expression_type(self, expr_ctx):
+        if expr_ctx.INT():
+            return "Int"
+        elif expr_ctx.STRING():
+            return "String"
+        elif expr_ctx.TRUE() or expr_ctx.FALSE():
+            return "Bool"
+        else:
+            # ... otros casos
+            return "Unknown"
 
     def enterFormal(self, ctx):
         object_ids = (

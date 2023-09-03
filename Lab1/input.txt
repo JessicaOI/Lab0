@@ -1,23 +1,9 @@
 class Main {
     var1: Int;
+    var2: String;
     main(): Int {
-        if var2 then 
-            var1 <- 0;
-        fi;
+        var2 <- "this should fail";
         return 0;
     };
-    var2: Bool;
 };
-
-
-class SecondClass {
-    secondMethod(): Int {
-        while var3 loop
-            var1 <- var1 + 1;
-        pool;
-        return var1;
-    };
-};
-
-
 
