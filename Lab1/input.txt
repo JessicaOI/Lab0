@@ -2,14 +2,8 @@ class Main {
     var1: Int;
     var2: String;
     main(): Int {
-        if var1 then
-            var2 <- "true branch";
-        else
-            var2 <- "false branch";
-        fi;
-        return "Hola";
+        var1 <- var1 + var2;
+        return 0;
     };
 };
-
-
 

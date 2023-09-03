@@ -498,20 +498,32 @@ class MyYAPLListener(YAPLListener):
             left_operand = ctx.getChild(0)
             operator = ctx.getChild(1).getText()
             right_operand = ctx.getChild(2)
-            operands = [left_operand, right_operand]
-
-            for operand in operands:
-                # Aquí asumimos que cada operand es otra ExpressionContext y tiene un método OBJECT_ID()
-                object_id = (
-                    operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
-                )
-                if object_id and not self.symbol_table.symbol_exists(
-                    object_id, self.current_scope
-                ):
-                    self.semantic_errors.append(
-                        f"Error en línea {operand.start.line}: Uso del atributo {object_id} antes de su declaración."
+            # Aquí comprobamos si la operación es aritmética
+            if operator in ["+", "-", "*", "/"]:
+                operands = [left_operand, right_operand]
+                for operand in operands:
+                    # Aquí asumimos que cada operand es otra ExpressionContext y tiene un método OBJECT_ID()
+                    object_id = (
+                        operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
                     )
-                    return
+                    if object_id:
+                        # Obtiene el símbolo correspondiente al identificador
+                        symbol = self.symbol_table.get_symbol(
+                            object_id, self.current_scope
+                        )
+                        if symbol and symbol.semantic_type != "Int":
+                            self.semantic_errors.append(
+                                f"Error en línea {ctx.start.line}: El operando {object_id} debe ser de tipo Int para la operación {operator}."
+                            )
+                            return
+                    elif operand.INT():  # Si el operando es un número entero literal
+                        continue  # Este es válido, así que sigue adelante
+                    else:
+                        # Aquí puedes manejar otros tipos de operandos que podrían no ser válidos para operaciones aritméticas
+                        self.semantic_errors.append(
+                            f"Error en línea {ctx.start.line}: Operandos no válidos para la operación {operator}."
+                        )
+                        return
         else:
             # Manejo para otras expresiones (no binarias)
             object_id = ctx.OBJECT_ID().getText() if ctx.OBJECT_ID() else None
