@@ -545,9 +545,18 @@ class MyYAPLListener(YAPLListener):
 
         # Verificar la compatibilidad de tipos
         if id_semantic_type != expr_semantic_type:
-            self.semantic_errors.append(
-                f"Error en línea {ctx.start.line}: Incompatibilidad de tipos. No se puede asignar un valor de tipo {expr_semantic_type} a una variable de tipo {id_semantic_type}."
-            )
+            # Añadir el caso especial para permitir el casteo implícito de Bool a Int
+            if id_semantic_type == "Int" and expr_semantic_type == "Bool":
+                # Aquí podrías hacer la conversión implícita, si es necesario
+                pass
+            # Añadir el caso especial para permitir el casteo implícito de Int a Bool
+            elif id_semantic_type == "Bool" and expr_semantic_type == "Int":
+                # Aquí podrías hacer la conversión implícita, si es necesario
+                pass
+            else:
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: Incompatibilidad de tipos. No se puede asignar un valor de tipo {expr_semantic_type} a una variable de tipo {id_semantic_type}."
+                )
 
         # Aquí también puedes hacer verificaciones adicionales relacionadas con la compatibilidad de tipos entre el identificador y la expresión.
 
