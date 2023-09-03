@@ -580,6 +580,12 @@ class MyYAPLListener(YAPLListener):
         for object_id, type_id in zip(object_ids, type_ids):
             object_id = object_id.getText()
             type_id = type_id.getText()
+
+            if type_id in self.basic_types:
+                pass_method = "byValue"
+            else:
+                pass_method = "byReference"
+
             symbol = Symbol(
                 name=object_id,
                 type="Formal",
@@ -592,7 +598,7 @@ class MyYAPLListener(YAPLListener):
                 semantic_type=type_id,
                 num_params=0,
                 param_types=[],
-                pass_method="byValue",
+                pass_method=pass_method,
             )
             self.symbol_table.add_symbol(symbol)
             self.current_memory_position += 1
