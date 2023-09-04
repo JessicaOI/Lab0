@@ -389,28 +389,29 @@ class MyYAPLListener(YAPLListener):
         self.has_class = True
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
 
-        # Supongamos que solo hay un nombre de clase y tal vez un padre en type_ids
         if len(type_ids) > 2:
             self.semantic_errors.append(
                 f"Error en línea {ctx.start.line}: No se permite la herencia múltiple."
             )
-            return  # Detener la ejecución adicional para esta clase
+            return
 
-        class_name = type_ids[0].getText()
+        # Verificar si type_ids no está vacío y si el primer elemento no es None
+        class_name = type_ids[0].getText() if type_ids and type_ids[0] is not None else None  
         self.current_scope = class_name
-
+        
         # Verificar si Main está heredando de alguna otra clase
         if class_name == "Main":
             if ctx.INHERITS():  # Verifica si hay una cláusula INHERITS
-                parent_class_name = ctx.TYPE_ID(1).getText()  # Nombre de la clase padre
-                self.semantic_errors.append(
-                    f"Error en línea {ctx.start.line}: La clase Main no puede heredar de {parent_class_name}."
-                )
+                parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None  # Verificación añadida aquí
+                if parent_class_name:  # Nueva condición añadida
+                    self.semantic_errors.append(
+                        f"Error en línea {ctx.start.line}: La clase Main no puede heredar de {parent_class_name}."
+                    )
             self.main_found = True
 
         # Crear y añadir símbolos para la tabla de símbolos
         for type_id in type_ids:
-            type_id_text = type_id.getText()
+            type_id_text = type_id.getText() if type_id is not None else None  # Añadida la comprobación para None
             symbol = Symbol(
                 name=type_id_text,
                 type="ClassType",
@@ -434,7 +435,7 @@ class MyYAPLListener(YAPLListener):
         parent_class_name = None
 
         if ctx.INHERITS():
-            parent_class_name = ctx.TYPE_ID(1).getText()
+            parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None  # Verificación añadida aquí
             visited_classes.add(class_name)
 
             while parent_class_name:
@@ -454,6 +455,7 @@ class MyYAPLListener(YAPLListener):
                     )
                 else:
                     break
+
 
         # Añadir las variables y métodos de la clase base al alcance actual
         if ctx.INHERITS():
@@ -477,7 +479,8 @@ class MyYAPLListener(YAPLListener):
 
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
 
-        method_name = object_ids[0].getText() if object_ids else None
+        method_name = object_ids[0].getText() if object_ids and object_ids[0] is not None else None  # Añadida la comprobación para None
+
         class_name = self.current_scope
 
         # Verificar si el método 'main' en la clase 'Main' tiene parámetros
@@ -505,8 +508,8 @@ class MyYAPLListener(YAPLListener):
 
         # Resto del código existente para manejar la adición de símbolos
         for object_id, type_id in zip(object_ids, type_ids):
-            object_id = object_id.getText()
-            type_id = type_id.getText()
+            object_id = object_id.getText() if object_id is not None else None  # Añadida la comprobación para None
+            type_id = type_id.getText() if type_id is not None else None  # Añadida la comprobación para None
 
             if self.symbol_table.symbol_exists_with_inheritance(
                 object_id, self.current_scope
@@ -536,7 +539,7 @@ class MyYAPLListener(YAPLListener):
             self.table.append(list(symbol.__dict__.values()))
 
         for object_id in object_ids:
-            object_id = object_id.getText()
+            object_id = object_id.getText() if object_id is not None else None  # Añadida la comprobación para None
             if not self.symbol_table.symbol_exists(object_id, self.current_scope):
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración."
@@ -549,7 +552,7 @@ class MyYAPLListener(YAPLListener):
         if ctx.getChildCount() == 2:
             operand = ctx.getChild(1)
             operator = ctx.getChild(0).getText()
-            object_id = operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
+            object_id = operand.OBJECT_ID().getText() if operand.OBJECT_ID() is not None else None  # Añadida la comprobación para None
 
             if operator == "~":
                 # Código existente para el operador ~
@@ -743,7 +746,7 @@ class MyYAPLListener(YAPLListener):
         )
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
         for object_id, type_id in zip(object_ids, type_ids):
-            object_id = object_id.getText()
+            object_id = object_id.getText() if object_id is not None else None  # Añadida la comprobación para None
             type_id = type_id.getText()
 
             if type_id in self.basic_types:
