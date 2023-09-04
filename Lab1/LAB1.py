@@ -482,6 +482,7 @@ class MyYAPLListener(YAPLListener):
 
         # Verificar si el método 'main' en la clase 'Main' tiene parámetros
         if class_name == "Main" and method_name == "main":
+            self.main_method_in_main_found = True
             formals = ctx.formals()
             if formals:
                 self.semantic_errors.append(
