@@ -666,6 +666,35 @@ class MyYAPLListener(YAPLListener):
             # ... otros casos
             return "Unknown"
 
+    def enterStatement(self, ctx):
+        # La siguiente condición verifica si la sentencia es un 'if' o un 'while'
+        if ctx.getChild(0).getText() in ["if", "while"]:
+            # Obtener la expresión
+            expr = ctx.expression()
+
+            # Aquí puedes asumir que cada expresión puede tener un OBJECT_ID()
+            object_id = expr.OBJECT_ID().getText() if expr.OBJECT_ID() else None
+
+            if object_id:
+                # Obtener el símbolo correspondiente al identificador
+                symbol = self.symbol_table.get_symbol(object_id, self.current_scope)
+                if symbol:
+                    # Comprobar si el tipo de la expresión es Bool
+                    if symbol.semantic_type != "Bool":
+                        self.semantic_errors.append(
+                            f"Error en línea {ctx.start.line}: La expresión en la estructura de control debe ser de tipo Bool."
+                        )
+                        return
+            elif expr.TRUE() or expr.FALSE():
+                # Si es un valor booleano literal, entonces está bien
+                return
+            else:
+                # Aquí puedes manejar otros tipos de expresiones que podrían no ser válidos para 'if' o 'while'
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: La expresión en la estructura de control debe ser de tipo Bool."
+                )
+                return
+
     def enterFormal(self, ctx):
         object_ids = (
             ctx.OBJECT_ID() if isinstance(ctx.OBJECT_ID(), list) else [ctx.OBJECT_ID()]
