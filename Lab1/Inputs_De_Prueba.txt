@@ -1,10 +1,70 @@
 Sencillo:
 
-
+class Main {
+    var1: Bool;
+    var2: String;
+    main(): Int {
+        if var1 then
+            var2 <- "true branch";
+        else
+            var2 <- "false branch";
+        fi;
+        return 0;
+    };
+};
 
 Intermedio:
+
+class Main {
+    var1: Int;
+    var2: String;
+    main(): Int {
+        if var1 then
+            var2 <- "true branch";
+        else
+            var2 <- "false branch";
+        fi;
+        return 0;
+    };
+};
+class SecondClass inherits Main {
+    var3: Bool;
+    secondMethod(): Int {
+        while var3 loop
+            var1 <- var1 + 1;
+        pool;
+        return var1;
+    };
+};
 
 
 
 Avanzado:
 
+class Main {
+    var1: Int;
+    var2: String;
+    main(): Int {
+        if var1 > 5 then
+            var2 <- "true branch";
+        elseif var1 < 0 then
+            var2 <- "negative branch";
+        else
+            var2 <- "false branch";
+        fi;
+        return 0;
+    };
+};
+
+class SecondClass inherits Main {
+    var3: Bool;
+    secondMethod(): Int {
+        while var3 loop
+            if var1 > 10 then
+                var1 <- var1 - 2;
+            else
+                var1 <- var1 + 2;
+            pool;
+        return var1;
+    };
+};
