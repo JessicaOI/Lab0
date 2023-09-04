@@ -524,6 +524,33 @@ class MyYAPLListener(YAPLListener):
                             f"Error en línea {ctx.start.line}: Operandos no válidos para la operación {operator}."
                         )
                         return
+            # Comprobando operaciones de comparación
+            elif operator in ["<", ">", "<=", ">=", "=", "!="]:
+                operands = [left_operand, right_operand]
+                types = []
+                for operand in operands:
+                    object_id = (
+                        operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
+                    )
+                    if object_id:
+                        symbol = self.symbol_table.get_symbol(
+                            object_id, self.current_scope
+                        )
+                        if symbol:
+                            types.append(symbol.semantic_type)
+                    elif operand.INT():
+                        types.append("Int")
+                    # Aquí puedes añadir más tipos si lo necesitas
+                    else:
+                        self.semantic_errors.append(
+                            f"Error en línea {ctx.start.line}: Operandos no válidos para la operación {operator}."
+                        )
+                        return
+
+                if len(set(types)) > 1:
+                    self.semantic_errors.append(
+                        f"Error en línea {ctx.start.line}: Los operandos para el operador {operator} deben ser del mismo tipo o de clases heredadas de la misma clase."
+                    )
         else:
             # Manejo para otras expresiones (no binarias)
             object_id = ctx.OBJECT_ID().getText() if ctx.OBJECT_ID() else None
@@ -565,10 +592,6 @@ class MyYAPLListener(YAPLListener):
             elif id_semantic_type == "Bool" and expr_semantic_type == "Int":
                 # Aquí podrías hacer la conversión implícita, si es necesario
                 pass
-            else:
-                self.semantic_errors.append(
-                    f"Error en línea {ctx.start.line}: Incompatibilidad de tipos. No se puede asignar un valor de tipo {expr_semantic_type} a una variable de tipo {id_semantic_type}."
-                )
 
         # Aquí también puedes hacer verificaciones adicionales relacionadas con la compatibilidad de tipos entre el identificador y la expresión.
 
