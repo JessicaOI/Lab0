@@ -266,7 +266,6 @@ class Symbol:
         num_params,
         param_types,
         pass_method,
-        default_value=None
     ):
         self.name = name
         self.type = type
@@ -280,7 +279,6 @@ class Symbol:
         self.num_params = num_params
         self.param_types = param_types
         self.pass_method = pass_method
-        self.default_value = default_value
 
 
 class SymbolTable:
@@ -294,14 +292,10 @@ class SymbolTable:
         self.symbols.append(symbol)
 
     def print_table(self):
-        headers = ["Name", "Type", "Scope", "Lexeme", "Token", "Memory Pos", "Line Num", "Line Pos", "Semantic Type", "Num Params", "Param Types", "Pass Method", "Default Value"]
-        table_data = []
-
         for symbol in self.symbols:
-            table_data.append(list(symbol.__dict__.values()))
-
-        print(tabulate(table_data, headers=headers, tablefmt='pretty'))
-
+            print(
+                f"Name: {symbol.name}, Tipo de Dato: {symbol.type}, Scope: {symbol.scope}, Lexema: {symbol.lexeme}, Token: {symbol.token}, Memory Pos: {symbol.memory_pos}, Line Num: {symbol.line_num}, Line Pos: {symbol.line_pos}, Tipo Semantico: {symbol.semantic_type}, Num Params: {symbol.num_params}, Tipo de Parametros: {symbol.param_types}, Metodo para paso de parámetros: {symbol.pass_method}"
+            )
 
     def symbol_exists(self, name, scope):
         return any(
@@ -439,19 +433,33 @@ class MyYAPLListener(YAPLListener):
 
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
 
-        # ... (El resto del código original sigue igual)
+        method_name = object_ids[0].getText() if object_ids else None
+
+        class_name = self.current_scope
+
+        if class_name == "Main" and method_name == "main":
+            self.main_method_in_main_found = (
+                True  # Indicar que main se ha encontrado, sin importar los parámetros
+            )
+            formals = (
+                ctx.formals()
+            )  # Suponiendo que 'formals' es cómo obtienes los parámetros formales
+            if formals:
+                self.semantic_errors.append(
+                    "Error: el método main en la clase Main no debe tener parámetros."
+                )
 
         for object_id, type_id in zip(object_ids, type_ids):
             object_id = object_id.getText()
             type_id = type_id.getText()
 
-            default_value = None  # Valor predeterminado
-            if type_id == "Int":
-                default_value = 0
-            elif type_id == "String":
-                default_value = ""
-            elif type_id == "Bool":
-                default_value = False
+            if self.symbol_table.symbol_exists_with_inheritance(
+                object_id, self.current_scope
+            ):
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: La variable o método {object_id} no puede ser sobrescrito en la clase hija."
+                )
+                return
 
             symbol = Symbol(
                 name=object_id,
@@ -466,7 +474,6 @@ class MyYAPLListener(YAPLListener):
                 num_params=0,
                 param_types=[],
                 pass_method="byValue",
-                default_value=default_value,  # Añadimos el valor predeterminado aquí
             )
             if self.symbol_table.symbol_exists(object_id, self.current_scope):
                 self.semantic_errors.append(
@@ -484,7 +491,6 @@ class MyYAPLListener(YAPLListener):
                     f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración."
                 )
                 return
-        self.symbol_table.print_table()
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
         # Comprueba operaciones binarias, que tendrían tres hijos (e.g., expression '+' expression)
@@ -640,7 +646,7 @@ class MyYAPLListener(YAPLListener):
         ]
 
         # --------Imprimir tabla de simbolos--------
-        #print(tabulate(self.table, headers=headers))
+        # print(tabulate(self.table, headers=headers))
 
 
 # -------------------------Analisis Semantico---------------------------------------------
