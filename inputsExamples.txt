@@ -1,0 +1,27 @@
+hereda clases:
+class Main {
+    var1: Int;
+    var2: String;
+    main(): Int {
+        if var1 then
+            var2 <- "true branch";
+        else
+            var2 <- "false branch";
+        fi;
+        return "Este es un String, no un Int";
+    };
+};
+
+class SecondClass inherits Main {
+    var3: Bool;
+    secondMethod(): Int {
+        while var3 loop
+            var1 <- var1 + 1;
+        pool;
+        return var1;
+    };
+};
+
+
+
+
