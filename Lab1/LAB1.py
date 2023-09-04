@@ -493,6 +493,46 @@ class MyYAPLListener(YAPLListener):
                 return
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
+
+        # Manejo de operaciones unarias
+        if ctx.getChildCount() == 2:
+            operand = ctx.getChild(1)
+            operator = ctx.getChild(0).getText()
+            object_id = operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
+
+            if operator == "~":
+                # Código existente para el operador ~
+                if object_id:
+                    symbol = self.symbol_table.get_symbol(object_id, self.current_scope)
+                    if symbol and symbol.semantic_type != "Int":
+                        self.semantic_errors.append(
+                            f"Error en línea {ctx.start.line}: El operando {object_id} debe ser de tipo Int para la operación unaria ~."
+                        )
+                        return
+                elif operand.INT():
+                    return
+                else:
+                    self.semantic_errors.append(
+                        f"Error en línea {ctx.start.line}: Operandos no válidos para la operación unaria ~."
+                    )
+                    return
+            elif operator == "not":
+                # Nuevo código para el operador 'not'
+                if object_id:
+                    symbol = self.symbol_table.get_symbol(object_id, self.current_scope)
+                    if symbol and symbol.semantic_type != "Bool":
+                        self.semantic_errors.append(
+                            f"Error en línea {ctx.start.line}: El operando {object_id} debe ser de tipo Bool para la operación 'not'."
+                        )
+                        return
+                elif operand.TRUE() or operand.FALSE():
+                    return
+                else:
+                    self.semantic_errors.append(
+                        f"Error en línea {ctx.start.line}: Operandos no válidos para la operación 'not'."
+                    )
+                    return
+
         # Comprueba operaciones binarias, que tendrían tres hijos (e.g., expression '+' expression)
         if ctx.getChildCount() == 3:
             left_operand = ctx.getChild(0)

@@ -1,20 +1,16 @@
 class Main {
     var1: Int;
-    var2: Int;
-    var3: String;
+    var2: String;
+    var3: Bool;
+    var4: Bool;
     main(): Int {
-        var1 <- 10;
-        var2 <- 20;
-        var3 <- "Hola";
-        if var1 < var2 then 
-            var1 <- var1 + 1;
-        else {
+        var1 <- ~var1;  
+        var1 <- ~var2;  
+        var1 <- ~var3; 
 
-        if var1 < var3 then
-            var2 <- var2 + 1;
-        fi;
-	
-	};
+        var3 <- not var3; 
+        var4 <- not var1; 
+        var4 <- not var2; 
 
         return 0;
     };
