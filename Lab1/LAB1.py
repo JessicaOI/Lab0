@@ -328,6 +328,15 @@ class SymbolTable:
                 return symbol
         return None  # Retorna None si no se encuentra el símbolo
 
+    def is_subtype(self, subtype, supertype):
+        # Verificar si subtype es un subtipo válido de supertype
+        # Esto puede involucrar buscar en la jerarquía de herencia de clases
+        while subtype in self.class_inheritance:
+            if subtype == supertype:
+                return True
+            subtype = self.class_inheritance[subtype]
+        return False
+
     def get_symbol_with_inheritance(self, name, scope):
         # Verifica primero en el alcance dado
         for symbol in self.symbols:
@@ -624,6 +633,13 @@ class MyYAPLListener(YAPLListener):
 
         # Verificar la compatibilidad de tipos
         if id_semantic_type != expr_semantic_type:
+            if not self.symbol_table.is_subtype(expr_semantic_type, id_semantic_type):
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: El tipo de la expresión no coincide con el tipo declarado para {object_id}."
+                )
+
+        # Verificar la compatibilidad de tipos
+        if id_semantic_type != expr_semantic_type:
             # Añadir el caso especial para permitir el casteo implícito de Bool a Int
             if id_semantic_type == "Int" and expr_semantic_type == "Bool":
                 # Aquí podrías hacer la conversión implícita, si es necesario
@@ -637,6 +653,9 @@ class MyYAPLListener(YAPLListener):
 
     # Método auxiliar para obtener el tipo semántico de una expresión (esto es solo un ejemplo simplificado)
     def get_expression_type(self, expr_ctx):
+        if expr_ctx is None:
+            # manejar el caso en que expr_ctx es None
+            return None
         if expr_ctx.INT():
             return "Int"
         elif expr_ctx.STRING():
