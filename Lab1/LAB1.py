@@ -352,6 +352,9 @@ class SymbolTable:
 
         return None  # Retorna None si no se encuentra el símbolo
 
+    def get_parent_class(self, class_name):
+        return self.class_inheritance.get(class_name, None)
+
 
 # -------------------------Fin declaraciones tabla de simbolos------------------------------------------
 
@@ -380,28 +383,39 @@ class MyYAPLListener(YAPLListener):
         self.has_attribute = False
         self.has_method = False
 
+    from copy import deepcopy
+
     def enterClassDef(self, ctx):
         self.has_class = True
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
-        for type_id in type_ids:
-            type_id = type_id.getText()
-            class_name = ctx.TYPE_ID()[0].getText()
-            self.current_scope = class_name
-            if class_name == "Main":
-                if ctx.INHERITS():  # Verifica si hay una cláusula INHERITS
-                    parent_class_name = ctx.TYPE_ID(
-                        1
-                    ).getText()  # Nombre de la clase padre
-                    self.semantic_errors.append(
-                        f"Error en línea {ctx.start.line}: La clase Main no puede heredar de {parent_class_name}."
-                    )
-                self.main_found = True
 
+        # Supongamos que solo hay un nombre de clase y tal vez un padre en type_ids
+        if len(type_ids) > 2:
+            self.semantic_errors.append(
+                f"Error en línea {ctx.start.line}: No se permite la herencia múltiple."
+            )
+            return  # Detener la ejecución adicional para esta clase
+
+        class_name = type_ids[0].getText()
+        self.current_scope = class_name
+
+        # Verificar si Main está heredando de alguna otra clase
+        if class_name == "Main":
+            if ctx.INHERITS():  # Verifica si hay una cláusula INHERITS
+                parent_class_name = ctx.TYPE_ID(1).getText()  # Nombre de la clase padre
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: La clase Main no puede heredar de {parent_class_name}."
+                )
+            self.main_found = True
+
+        # Crear y añadir símbolos para la tabla de símbolos
+        for type_id in type_ids:
+            type_id_text = type_id.getText()
             symbol = Symbol(
-                name=type_id,
+                name=type_id_text,
                 type="ClassType",
                 scope=self.current_scope,
-                lexeme=type_id,
+                lexeme=type_id_text,
                 token="ClassType",
                 memory_pos=self.current_memory_position,
                 line_num=ctx.start.line,
@@ -414,22 +428,43 @@ class MyYAPLListener(YAPLListener):
             self.symbol_table.add_symbol(symbol)
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
-        self.current_scope = type_ids[0].getText()
 
-        class_name2 = ctx.TYPE_ID()[0].getText()
-        # Si la clase tiene una clase padre (por la presencia de INHERITS)
+        # Código para detectar herencia recursiva
+        visited_classes = set()
+        parent_class_name = None
+
         if ctx.INHERITS():
             parent_class_name = ctx.TYPE_ID(1).getText()
+            visited_classes.add(class_name)
 
-            # Añadir las variables y métodos de la clase base al alcance actual
+            while parent_class_name:
+                if parent_class_name in visited_classes:
+                    self.semantic_errors.append(
+                        f"Error en línea {ctx.start.line}: No se permite la herencia recursiva."
+                    )
+                    return
+                visited_classes.add(parent_class_name)
+
+                parent_class_symbol = self.symbol_table.get_symbol(
+                    parent_class_name, "global"
+                )
+                if parent_class_symbol:
+                    parent_class_name = self.symbol_table.get_parent_class(
+                        parent_class_name
+                    )
+                else:
+                    break
+
+        # Añadir las variables y métodos de la clase base al alcance actual
+        if ctx.INHERITS():
             for symbol in self.symbol_table.symbols:
                 if symbol.scope == parent_class_name:
                     inherited_symbol = deepcopy(symbol)
-                    inherited_symbol.scope = class_name2
+                    inherited_symbol.scope = class_name
                     self.symbol_table.add_symbol(inherited_symbol)
 
             # Añadir la relación de herencia
-            self.symbol_table.add_inheritance(class_name2, parent_class_name)
+            self.symbol_table.add_inheritance(class_name, parent_class_name)
 
     def exitClassDef(self, ctx):
         self.current_scope = "global"
@@ -443,21 +478,31 @@ class MyYAPLListener(YAPLListener):
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
 
         method_name = object_ids[0].getText() if object_ids else None
-
         class_name = self.current_scope
 
+        # Verificar si el método 'main' en la clase 'Main' tiene parámetros
         if class_name == "Main" and method_name == "main":
-            self.main_method_in_main_found = (
-                True  # Indicar que main se ha encontrado, sin importar los parámetros
-            )
-            formals = (
-                ctx.formals()
-            )  # Suponiendo que 'formals' es cómo obtienes los parámetros formales
+            formals = ctx.formals()
             if formals:
                 self.semantic_errors.append(
                     "Error: el método main en la clase Main no debe tener parámetros."
                 )
 
+        # Comparación de firmas si se sobrescribe un método
+        ancestor_class = self.symbol_table.get_parent_class(class_name)
+        while ancestor_class:
+            ancestor_method = self.symbol_table.get_symbol_with_inheritance(
+                method_name, ancestor_class
+            )
+            if ancestor_method:
+                if ancestor_method.semantic_type != type_ids[0].getText():
+                    self.semantic_errors.append(
+                        f"Error en línea {ctx.start.line}: El método {method_name} en la clase {class_name} tiene un tipo de retorno diferente al del método en la clase {ancestor_class}."
+                    )
+                    return
+            ancestor_class = self.symbol_table.get_parent_class(ancestor_class)
+
+        # Resto del código existente para manejar la adición de símbolos
         for object_id, type_id in zip(object_ids, type_ids):
             object_id = object_id.getText()
             type_id = type_id.getText()
@@ -480,19 +525,15 @@ class MyYAPLListener(YAPLListener):
                 line_num=ctx.start.line,
                 line_pos=ctx.start.column,
                 semantic_type=type_id,
-                num_params=0,
-                param_types=[],
+                num_params=0,  # Aquí puedes agregar la lógica para contar los parámetros
+                param_types=[],  # Aquí puedes agregar la lógica para guardar los tipos de los parámetros
                 pass_method="byValue",
             )
-            if self.symbol_table.symbol_exists(object_id, self.current_scope):
-                self.semantic_errors.append(
-                    f"Error en línea {ctx.start.line}: La variable {object_id} ya ha sido declarada en este ámbito."
-                )
-                return
+
             self.symbol_table.add_symbol(symbol)
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
-        # Verificación para asegurarse de que cualquier atributo utilizado ha sido declarado
+
         for object_id in object_ids:
             object_id = object_id.getText()
             if not self.symbol_table.symbol_exists(object_id, self.current_scope):
