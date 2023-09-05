@@ -1,4 +1,4 @@
-class Main {
+class Main2 inherits Main2 {
     var1: Bool;
     var2: String;
     main(): Int {
@@ -11,7 +11,7 @@ class Main {
     };
 };
 
-class SecondClass inherits Main {
+class SecondClass inherits SecondClass, Main2 {
     var3: Bool;
     var4: Int;
     secondMethod(): Int {
@@ -21,3 +21,4 @@ class SecondClass inherits Main {
         return var4;
     };
 };
+

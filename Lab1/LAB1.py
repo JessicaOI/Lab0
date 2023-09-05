@@ -401,6 +401,13 @@ class MyYAPLListener(YAPLListener):
     def enterClassDef(self, ctx):
         self.has_class = True
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
+
+        if len(type_ids) > 2:
+            self.semantic_errors.append(
+                f"Error en línea {ctx.start.line}: No se permite la herencia múltiple."
+            )
+            return
+        
         for type_id in type_ids:
             type_id = type_id.getText()
             class_name = ctx.TYPE_ID()[0].getText()
@@ -433,10 +440,24 @@ class MyYAPLListener(YAPLListener):
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
         self.current_scope = type_ids[0].getText()
+        visited_classes = set()
+        parent_class_name = None
 
         class_name2 = ctx.TYPE_ID()[0].getText()
         # Si la clase tiene una clase padre (por la presencia de INHERITS)
         if ctx.INHERITS():
+
+            parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None  # Verificación añadida aquí
+            visited_classes.add(class_name)
+
+            while parent_class_name:
+                if parent_class_name in visited_classes:
+                    self.semantic_errors.append(
+                        f"Error en línea {ctx.start.line}: No se permite la herencia recursiva."
+                    )
+                    return
+                visited_classes.add(parent_class_name)
+
             parent_class_name = ctx.TYPE_ID(1).getText()
 
             # Añadir las variables y métodos de la clase base al alcance actual
