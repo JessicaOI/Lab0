@@ -280,7 +280,7 @@ class Symbol:
         self.num_params = num_params
         self.param_types = param_types
         self.pass_method = pass_method
-        self.default_value = default_value  
+        self.default_value = default_value
 
 
 class SymbolTable:
@@ -453,7 +453,7 @@ class MyYAPLListener(YAPLListener):
         self.current_scope = "global"
 
     def enterFeature(self, ctx):
-        print("Entrando a enterFeature")  # Debugging
+        # print("Entrando a enterFeature")  # Debugging
 
         self.has_attribute = True
         object_ids = (
@@ -471,13 +471,13 @@ class MyYAPLListener(YAPLListener):
                 self.semantic_errors.append(
                     "Error: el método main en la clase Main no debe tener parámetros."
                 )
-                print("Saliendo tempranamente debido a formals")  # Debugging
+                # print("Saliendo tempranamente debido a formals")  # Debugging
                 return
 
         for object_id, type_id in zip(object_ids, type_ids):
             object_id = object_id.getText()
             type_id = type_id.getText()
-
+            # valores default
             default_value = None
             if type_id == "Int":
                 default_value = 0
@@ -492,9 +492,9 @@ class MyYAPLListener(YAPLListener):
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: La variable o método {object_id} no puede ser sobrescrito en la clase hija."
                 )
-                print(
-                    f"Saliendo tempranamente debido al símbolo {object_id}"
-                )  # Debugging
+                # print(
+                #     f"Saliendo tempranamente debido al símbolo {object_id}"
+                # )  # Debugging
                 return
 
             symbol = Symbol(
@@ -517,9 +517,9 @@ class MyYAPLListener(YAPLListener):
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: La variable {object_id} ya ha sido declarada en este ámbito."
                 )
-                print(
-                    f"Saliendo tempranamente debido al símbolo {object_id}"
-                )  # Debugging
+                # print(
+                #     f"Saliendo tempranamente debido al símbolo {object_id}"
+                # )  # Debugging
                 return
 
             self.symbol_table.add_symbol(symbol)
@@ -533,13 +533,14 @@ class MyYAPLListener(YAPLListener):
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración."
                 )
-                print(
-                    f"Saliendo tempranamente debido al símbolo {object_id}"
-                )  # Debugging
+                # print(
+                #     f"Saliendo tempranamente debido al símbolo {object_id}"
+                # )  # Debugging
                 return
 
-        self.symbol_table.print_table()
-        print("Saliendo de enterFeature")  # Debugging
+        # print de valores default
+        # self.symbol_table.print_table()
+        # print("Saliendo de enterFeature")  # Debugging
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
 
