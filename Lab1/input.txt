@@ -1,22 +1,16 @@
 class Main {
     var1: Bool;
     var2: String;
+    var3: Int;
     main(): Int {
-        if var1 then
-            var2 <- "true branch";
-        else
-            var2 <- "false branch";
-        fi;
         return 0;
     };
 };
-class SecondClass inherits Main {
-    var3: Bool;
-    secondMethod(): Int {
-        while var3 loop
-            var2 <- "false branch";
-        pool;
-        return var2;
-    };
-};
+
+
+
+
+
+
+
 

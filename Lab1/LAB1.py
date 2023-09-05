@@ -266,6 +266,7 @@ class Symbol:
         num_params,
         param_types,
         pass_method,
+        default_value=None,
     ):
         self.name = name
         self.type = type
@@ -279,6 +280,7 @@ class Symbol:
         self.num_params = num_params
         self.param_types = param_types
         self.pass_method = pass_method
+        self.default_value = default_value  
 
 
 class SymbolTable:
@@ -292,10 +294,26 @@ class SymbolTable:
         self.symbols.append(symbol)
 
     def print_table(self):
+        headers = [
+            "Name",
+            "Type",
+            "Scope",
+            "Lexeme",
+            "Token",
+            "Memory Pos",
+            "Line Num",
+            "Line Pos",
+            "Semantic Type",
+            "Num Params",
+            "Param Types",
+            "Pass Method",
+            "Default Value",
+        ]
+        table_data = []
         for symbol in self.symbols:
-            print(
-                f"Name: {symbol.name}, Tipo de Dato: {symbol.type}, Scope: {symbol.scope}, Lexema: {symbol.lexeme}, Token: {symbol.token}, Memory Pos: {symbol.memory_pos}, Line Num: {symbol.line_num}, Line Pos: {symbol.line_pos}, Tipo Semantico: {symbol.semantic_type}, Num Params: {symbol.num_params}, Tipo de Parametros: {symbol.param_types}, Metodo para paso de parámetros: {symbol.pass_method}"
-            )
+            table_data.append(list(symbol.__dict__.values()))
+
+        print(tabulate(table_data, headers=headers, tablefmt="pretty"))
 
     def symbol_exists(self, name, scope):
         return any(
@@ -352,9 +370,6 @@ class SymbolTable:
 
         return None  # Retorna None si no se encuentra el símbolo
 
-    def get_parent_class(self, class_name):
-        return self.class_inheritance.get(class_name, None)
-
 
 # -------------------------Fin declaraciones tabla de simbolos------------------------------------------
 
@@ -383,40 +398,28 @@ class MyYAPLListener(YAPLListener):
         self.has_attribute = False
         self.has_method = False
 
-    from copy import deepcopy
-
     def enterClassDef(self, ctx):
         self.has_class = True
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
-
-        if len(type_ids) > 2:
-            self.semantic_errors.append(
-                f"Error en línea {ctx.start.line}: No se permite la herencia múltiple."
-            )
-            return
-
-        # Verificar si type_ids no está vacío y si el primer elemento no es None
-        class_name = type_ids[0].getText() if type_ids and type_ids[0] is not None else None  
-        self.current_scope = class_name
-        
-        # Verificar si Main está heredando de alguna otra clase
-        if class_name == "Main":
-            if ctx.INHERITS():  # Verifica si hay una cláusula INHERITS
-                parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None  # Verificación añadida aquí
-                if parent_class_name:  # Nueva condición añadida
+        for type_id in type_ids:
+            type_id = type_id.getText()
+            class_name = ctx.TYPE_ID()[0].getText()
+            self.current_scope = class_name
+            if class_name == "Main":
+                if ctx.INHERITS():  # Verifica si hay una cláusula INHERITS
+                    parent_class_name = ctx.TYPE_ID(
+                        1
+                    ).getText()  # Nombre de la clase padre
                     self.semantic_errors.append(
                         f"Error en línea {ctx.start.line}: La clase Main no puede heredar de {parent_class_name}."
                     )
-            self.main_found = True
+                self.main_found = True
 
-        # Crear y añadir símbolos para la tabla de símbolos
-        for type_id in type_ids:
-            type_id_text = type_id.getText() if type_id is not None else None  # Añadida la comprobación para None
             symbol = Symbol(
-                name=type_id_text,
+                name=type_id,
                 type="ClassType",
                 scope=self.current_scope,
-                lexeme=type_id_text,
+                lexeme=type_id,
                 token="ClassType",
                 memory_pos=self.current_memory_position,
                 line_num=ctx.start.line,
@@ -429,87 +432,59 @@ class MyYAPLListener(YAPLListener):
             self.symbol_table.add_symbol(symbol)
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
+        self.current_scope = type_ids[0].getText()
 
-        # Código para detectar herencia recursiva
-        visited_classes = set()
-        parent_class_name = None
-
+        class_name2 = ctx.TYPE_ID()[0].getText()
+        # Si la clase tiene una clase padre (por la presencia de INHERITS)
         if ctx.INHERITS():
-            parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None  # Verificación añadida aquí
-            visited_classes.add(class_name)
+            parent_class_name = ctx.TYPE_ID(1).getText()
 
-            while parent_class_name:
-                if parent_class_name in visited_classes:
-                    self.semantic_errors.append(
-                        f"Error en línea {ctx.start.line}: No se permite la herencia recursiva."
-                    )
-                    return
-                visited_classes.add(parent_class_name)
-
-                parent_class_symbol = self.symbol_table.get_symbol(
-                    parent_class_name, "global"
-                )
-                if parent_class_symbol:
-                    parent_class_name = self.symbol_table.get_parent_class(
-                        parent_class_name
-                    )
-                else:
-                    break
-
-
-        # Añadir las variables y métodos de la clase base al alcance actual
-        if ctx.INHERITS():
+            # Añadir las variables y métodos de la clase base al alcance actual
             for symbol in self.symbol_table.symbols:
                 if symbol.scope == parent_class_name:
                     inherited_symbol = deepcopy(symbol)
-                    inherited_symbol.scope = class_name
+                    inherited_symbol.scope = class_name2
                     self.symbol_table.add_symbol(inherited_symbol)
 
             # Añadir la relación de herencia
-            self.symbol_table.add_inheritance(class_name, parent_class_name)
+            self.symbol_table.add_inheritance(class_name2, parent_class_name)
 
     def exitClassDef(self, ctx):
         self.current_scope = "global"
 
     def enterFeature(self, ctx):
+        print("Entrando a enterFeature")  # Debugging
+
         self.has_attribute = True
         object_ids = (
             ctx.OBJECT_ID() if isinstance(ctx.OBJECT_ID(), list) else [ctx.OBJECT_ID()]
         )
-
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
-
-        method_name = object_ids[0].getText() if object_ids and object_ids[0] is not None else None  # Añadida la comprobación para None
-
+        method_name = object_ids[0].getText() if object_ids else None
         class_name = self.current_scope
 
-        # Verificar si el método 'main' en la clase 'Main' tiene parámetros
         if class_name == "Main" and method_name == "main":
             self.main_method_in_main_found = True
             formals = ctx.formals()
+
             if formals:
                 self.semantic_errors.append(
                     "Error: el método main en la clase Main no debe tener parámetros."
                 )
+                print("Saliendo tempranamente debido a formals")  # Debugging
+                return
 
-        # Comparación de firmas si se sobrescribe un método
-        ancestor_class = self.symbol_table.get_parent_class(class_name)
-        while ancestor_class:
-            ancestor_method = self.symbol_table.get_symbol_with_inheritance(
-                method_name, ancestor_class
-            )
-            if ancestor_method:
-                if ancestor_method.semantic_type != type_ids[0].getText():
-                    self.semantic_errors.append(
-                        f"Error en línea {ctx.start.line}: El método {method_name} en la clase {class_name} tiene un tipo de retorno diferente al del método en la clase {ancestor_class}."
-                    )
-                    return
-            ancestor_class = self.symbol_table.get_parent_class(ancestor_class)
-
-        # Resto del código existente para manejar la adición de símbolos
         for object_id, type_id in zip(object_ids, type_ids):
-            object_id = object_id.getText() if object_id is not None else None  # Añadida la comprobación para None
-            type_id = type_id.getText() if type_id is not None else None  # Añadida la comprobación para None
+            object_id = object_id.getText()
+            type_id = type_id.getText()
+
+            default_value = None
+            if type_id == "Int":
+                default_value = 0
+            elif type_id == "String":
+                default_value = ""
+            elif type_id == "Bool":
+                default_value = False
 
             if self.symbol_table.symbol_exists_with_inheritance(
                 object_id, self.current_scope
@@ -517,6 +492,9 @@ class MyYAPLListener(YAPLListener):
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: La variable o método {object_id} no puede ser sobrescrito en la clase hija."
                 )
+                print(
+                    f"Saliendo tempranamente debido al símbolo {object_id}"
+                )  # Debugging
                 return
 
             symbol = Symbol(
@@ -529,22 +507,39 @@ class MyYAPLListener(YAPLListener):
                 line_num=ctx.start.line,
                 line_pos=ctx.start.column,
                 semantic_type=type_id,
-                num_params=0,  # Aquí puedes agregar la lógica para contar los parámetros
-                param_types=[],  # Aquí puedes agregar la lógica para guardar los tipos de los parámetros
+                num_params=0,
+                param_types=[],
                 pass_method="byValue",
+                default_value=default_value,
             )
+
+            if self.symbol_table.symbol_exists(object_id, self.current_scope):
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: La variable {object_id} ya ha sido declarada en este ámbito."
+                )
+                print(
+                    f"Saliendo tempranamente debido al símbolo {object_id}"
+                )  # Debugging
+                return
 
             self.symbol_table.add_symbol(symbol)
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
 
         for object_id in object_ids:
-            object_id = object_id.getText() if object_id is not None else None  # Añadida la comprobación para None
+            object_id = object_id.getText()
+
             if not self.symbol_table.symbol_exists(object_id, self.current_scope):
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración."
                 )
+                print(
+                    f"Saliendo tempranamente debido al símbolo {object_id}"
+                )  # Debugging
                 return
+
+        self.symbol_table.print_table()
+        print("Saliendo de enterFeature")  # Debugging
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
 
@@ -552,7 +547,7 @@ class MyYAPLListener(YAPLListener):
         if ctx.getChildCount() == 2:
             operand = ctx.getChild(1)
             operator = ctx.getChild(0).getText()
-            object_id = operand.OBJECT_ID().getText() if operand.OBJECT_ID() is not None else None  # Añadida la comprobación para None
+            object_id = operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
 
             if operator == "~":
                 # Código existente para el operador ~
@@ -746,7 +741,7 @@ class MyYAPLListener(YAPLListener):
         )
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
         for object_id, type_id in zip(object_ids, type_ids):
-            object_id = object_id.getText() if object_id is not None else None  # Añadida la comprobación para None
+            object_id = object_id.getText()
             type_id = type_id.getText()
 
             if type_id in self.basic_types:
