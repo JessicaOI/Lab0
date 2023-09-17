@@ -267,6 +267,7 @@ class Symbol:
         param_types,
         pass_method,
         default_value=None,
+        byte_size=None
     ):
         self.name = name
         self.type = type
@@ -281,6 +282,7 @@ class Symbol:
         self.param_types = param_types
         self.pass_method = pass_method
         self.default_value = default_value
+        self.byte_size = byte_size
 
 
 class SymbolTable:
@@ -308,6 +310,7 @@ class SymbolTable:
             "Param Types",
             "Pass Method",
             "Default Value",
+            "Byte Size"
         ]
         table_data = []
         for symbol in self.symbols:
@@ -397,6 +400,11 @@ class MyYAPLListener(YAPLListener):
         self.has_class = False
         self.has_attribute = False
         self.has_method = False
+        self.type_size_map = {
+        "Int": 4,  # Suponiendo que un entero ocupa 4 bytes
+        "String": 1,  # Suponiendo que un carácter en una cadena ocupa 1 byte
+        "Bool": 1  # Suponiendo que un booleano ocupa 1 byte
+        }
 
     def enterClassDef(self, ctx):
         self.has_class = True
@@ -502,10 +510,13 @@ class MyYAPLListener(YAPLListener):
             default_value = None
             if type_id == "Int":
                 default_value = 0
+                byte_size = 4 #agrgando los tamaños, 4 bytes
             elif type_id == "String":
                 default_value = ""
+                byte_size = 1 #agrgando los tamaños, 1 bytes
             elif type_id == "Bool":
                 default_value = False
+                byte_size = 1 #agrgando los tamaños, 4 bytes
 
             if self.symbol_table.symbol_exists_with_inheritance(
                 object_id, self.current_scope
@@ -532,6 +543,7 @@ class MyYAPLListener(YAPLListener):
                 param_types=[],
                 pass_method="byValue",
                 default_value=default_value,
+                byte_size=byte_size,
             )
 
             if self.symbol_table.symbol_exists(object_id, self.current_scope):
@@ -560,7 +572,7 @@ class MyYAPLListener(YAPLListener):
                 return
 
         # print de valores default
-        # self.symbol_table.print_table()
+        self.symbol_table.print_table()
         # print("Saliendo de enterFeature")  # Debugging
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
