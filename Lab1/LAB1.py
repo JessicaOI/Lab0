@@ -267,7 +267,7 @@ class Symbol:
         param_types,
         pass_method,
         default_value=None,
-        byte_size=None
+        byte_size=None,
     ):
         self.name = name
         self.type = type
@@ -310,7 +310,7 @@ class SymbolTable:
             "Param Types",
             "Pass Method",
             "Default Value",
-            "Byte Size"
+            "Byte Size",
         ]
         table_data = []
         for symbol in self.symbols:
@@ -373,6 +373,15 @@ class SymbolTable:
 
         return None  # Retorna None si no se encuentra el símbolo
 
+    # Método dentro de la clase SymbolTable
+    def update_class_size(self, class_name, added_size):
+        for symbol in self.symbols:
+            if symbol.name == class_name and symbol.type == "ClassType":
+                if symbol.byte_size is None:
+                    symbol.byte_size = 0
+                symbol.byte_size += added_size
+                break
+
 
 # -------------------------Fin declaraciones tabla de simbolos------------------------------------------
 
@@ -401,9 +410,9 @@ class MyYAPLListener(YAPLListener):
         self.has_attribute = False
         self.has_method = False
         self.type_size_map = {
-        "Int": 4,  # Suponiendo que un entero ocupa 4 bytes
-        "String": 1,  # Suponiendo que un carácter en una cadena ocupa 1 byte
-        "Bool": 1  # Suponiendo que un booleano ocupa 1 byte
+            "Int": 4,  # Suponiendo que un entero ocupa 4 bytes
+            "String": 1,  # Suponiendo que un carácter en una cadena ocupa 1 byte
+            "Bool": 1,  # Suponiendo que un booleano ocupa 1 byte
         }
 
     def enterClassDef(self, ctx):
@@ -415,7 +424,7 @@ class MyYAPLListener(YAPLListener):
                 f"Error en línea {ctx.start.line}: No se permite la herencia múltiple."
             )
             return
-        
+
         for type_id in type_ids:
             type_id = type_id.getText()
             class_name = ctx.TYPE_ID()[0].getText()
@@ -455,7 +464,9 @@ class MyYAPLListener(YAPLListener):
         # Si la clase tiene una clase padre (por la presencia de INHERITS)
         if ctx.INHERITS():
 
-            parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None  # Verificación añadida aquí
+            parent_class_name = (
+                ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None
+            )  # Verificación añadida aquí
             visited_classes.add(class_name)
 
             while parent_class_name:
@@ -510,13 +521,18 @@ class MyYAPLListener(YAPLListener):
             default_value = None
             if type_id == "Int":
                 default_value = 0
-                byte_size = 4 #agrgando los tamaños, 4 bytes
+                byte_size = 4  # agrgando los tamaños, 4 bytes
             elif type_id == "String":
                 default_value = ""
-                byte_size = 1 #agrgando los tamaños, 1 bytes
+                # Estableciendo el tamaño máximo en bytes para un String
+                max_length = 256
+                # Asignando el tamaño máximo a byte_size
+                byte_size = max_length
             elif type_id == "Bool":
                 default_value = False
-                byte_size = 1 #agrgando los tamaños, 4 bytes
+                byte_size = 1  # agrgando los tamaños, 4 bytes
+
+            self.symbol_table.update_class_size(self.current_scope, byte_size)
 
             if self.symbol_table.symbol_exists_with_inheritance(
                 object_id, self.current_scope
