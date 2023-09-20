@@ -295,7 +295,12 @@ class SymbolTable:
     def add_symbol(self, symbol):
         self.symbols.append(symbol)
 
+    import os
+
     def print_table(self):
+        # Limpiar la consola antes de imprimir
+        os.system("clear" if os.name == "posix" else "cls")
+
         headers = [
             "Name",
             "Type",
@@ -325,6 +330,13 @@ class SymbolTable:
 
     def add_inheritance(self, derived, base):
         self.class_inheritance[derived] = base
+
+        # Copiar el tamaño de la clase base al alcance de la clase derivada
+        base_size = self.get_total_class_size(base)
+        for symbol in self.symbols:
+            if symbol.name == derived and symbol.scope == derived:
+                symbol.byte_size = base_size
+                break
 
     def symbol_exists_with_inheritance(self, name, scope):
         # Verifica primero en el alcance dado
@@ -373,13 +385,62 @@ class SymbolTable:
 
         return None  # Retorna None si no se encuentra el símbolo
 
-    # Método dentro de la clase SymbolTable
-    def update_class_size(self, class_name, added_size):
+    def get_parent_class(self, class_name):
+        """Devuelve el nombre de la clase padre de class_name, si es que tiene una."""
+        return self.class_inheritance.get(class_name, None)
+
+    def get_class_size(self, class_name):
+        """Obtiene el tamaño de una clase específica."""
         for symbol in self.symbols:
             if symbol.name == class_name and symbol.type == "ClassType":
+                return symbol.byte_size if symbol.byte_size is not None else 0
+        return 0
+
+    def get_total_class_size(self, class_name):
+        """Obtiene el tamaño total de una clase, incluyendo el tamaño de sus clases padre."""
+        total_size = 0
+        current_class = class_name
+        while current_class:
+            total_size += self.get_class_size(current_class)
+            # Obtener la clase padre de current_class
+            current_class = self.get_parent_class(current_class)
+        return total_size
+
+    def update_class_size(self, class_name, added_size):
+        classes_to_update = [class_name] + self.get_derived_classes(class_name)
+
+        for class_to_update in classes_to_update:
+            for symbol in self.symbols:
+                if symbol.name == class_to_update and symbol.type == "ClassType":
+                    # Inicializar el byte_size si es None
+                    if symbol.byte_size is None:
+                        symbol.byte_size = 0
+                    # Ahora, sumar el added_size
+                    symbol.byte_size += added_size
+                    break
+
+    def get_derived_classes(self, base_class):
+        return [
+            derived
+            for derived, base in self.class_inheritance.items()
+            if base == base_class
+        ]
+
+    def set_inheritance(self, derived_class_name, base_class_name):
+        base_class_size = next(
+            (
+                sym.byte_size
+                for sym in self.symbols
+                if sym.name == base_class_name and sym.type == "ClassType"
+            ),
+            0,
+        )
+
+        for symbol in self.symbols:
+            if symbol.name == derived_class_name and symbol.type == "ClassType":
                 if symbol.byte_size is None:
                     symbol.byte_size = 0
-                symbol.byte_size += added_size
+                symbol.byte_size += base_class_size
                 break
 
 
@@ -411,7 +472,7 @@ class MyYAPLListener(YAPLListener):
         self.has_method = False
         self.type_size_map = {
             "Int": 4,  # Suponiendo que un entero ocupa 4 bytes
-            "String": 1,  # Suponiendo que un carácter en una cadena ocupa 1 byte
+            "String": 256,  # Suponiendo que un carácter en una cadena ocupa 1 byte
             "Bool": 1,  # Suponiendo que un booleano ocupa 1 byte
         }
 
@@ -437,6 +498,7 @@ class MyYAPLListener(YAPLListener):
                     self.semantic_errors.append(
                         f"Error en línea {ctx.start.line}: La clase Main no puede heredar de {parent_class_name}."
                     )
+                    return  # Retorna inmediatamente después de agregar el error semántico
                 self.main_found = True
 
             symbol = Symbol(
@@ -452,6 +514,7 @@ class MyYAPLListener(YAPLListener):
                 num_params=0,
                 param_types=[],
                 pass_method="byValue",
+                byte_size=0,
             )
             self.symbol_table.add_symbol(symbol)
             self.current_memory_position += 1
@@ -469,6 +532,9 @@ class MyYAPLListener(YAPLListener):
             )  # Verificación añadida aquí
             visited_classes.add(class_name)
 
+            visited_classes = set()
+            visited_classes.add(class_name2)  # Añade el nombre de la clase actual
+
             while parent_class_name:
                 if parent_class_name in visited_classes:
                     self.semantic_errors.append(
@@ -476,8 +542,12 @@ class MyYAPLListener(YAPLListener):
                     )
                     return
                 visited_classes.add(parent_class_name)
-
-            parent_class_name = ctx.TYPE_ID(1).getText()
+                parent_symbol = self.symbol_table.get_symbol(
+                    parent_class_name, "ClassType"
+                )
+                parent_class_name = (
+                    parent_symbol.parent_class_name if parent_symbol else None
+                )  # Aquí es donde actualizas el parent_class_name
 
             # Añadir las variables y métodos de la clase base al alcance actual
             for symbol in self.symbol_table.symbols:
@@ -847,7 +917,7 @@ class MyYAPLListener(YAPLListener):
         ]
 
         # --------Imprimir tabla de simbolos--------
-        # print(tabulate(self.table, headers=headers))
+        # print(tabulate(self.table, headers=headers, tablefmt="pretty"))
 
 
 # -------------------------Analisis Semantico---------------------------------------------

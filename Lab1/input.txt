@@ -12,7 +12,7 @@ class Main {
     };
 };
 
-class SecondClass inherits Main {
+class SecondClass {
     var3: Bool;
     var4: Int;
     
@@ -23,4 +23,5 @@ class SecondClass inherits Main {
         return var4;
     };
 };
+
 
