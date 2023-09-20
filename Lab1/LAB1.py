@@ -388,14 +388,7 @@ class SymbolTable:
     def get_parent_class(self, class_name):
         """Devuelve el nombre de la clase padre de class_name, si es que tiene una."""
         return self.class_inheritance.get(class_name, None)
-
-    def get_class_size(self, class_name):
-        """Obtiene el tamaño de una clase específica."""
-        for symbol in self.symbols:
-            if symbol.name == class_name and symbol.type == "ClassType":
-                return symbol.byte_size if symbol.byte_size is not None else 0
-        return 0
-
+    
     def get_total_class_size(self, class_name):
         """Obtiene el tamaño total de una clase, incluyendo el tamaño de sus clases padre."""
         total_size = 0
@@ -410,14 +403,20 @@ class SymbolTable:
         classes_to_update = [class_name] + self.get_derived_classes(class_name)
 
         for class_to_update in classes_to_update:
-            for symbol in self.symbols:
-                if symbol.name == class_to_update and symbol.type == "ClassType":
-                    # Inicializar el byte_size si es None
-                    if symbol.byte_size is None:
-                        symbol.byte_size = 0
-                    # Ahora, sumar el added_size
-                    symbol.byte_size += added_size
-                    break
+            # Buscar el símbolo en la lista symbols
+            symbol = next((s for s in self.symbols if s.name == class_to_update and s.type == "ClassType"), None)
+            if symbol:
+                # Inicializar el byte_size si es None
+                if symbol.byte_size is None:
+                    symbol.byte_size = 0
+                # Sumar el added_size
+                symbol.byte_size += added_size
+                # Agregar el tamaño de la clase base si está heredando de alguna
+                if class_to_update in self.class_inheritance:
+                    base_class_name = self.class_inheritance[class_to_update]
+                    base_class_size = self.get_total_class_size(base_class_name)
+                    symbol.byte_size += base_class_size
+
 
     def get_derived_classes(self, base_class):
         return [
@@ -486,54 +485,46 @@ class MyYAPLListener(YAPLListener):
             )
             return
 
-        for type_id in type_ids:
-            type_id = type_id.getText()
-            class_name = ctx.TYPE_ID()[0].getText()
-            self.current_scope = class_name
-            if class_name == "Main":
-                if ctx.INHERITS():  # Verifica si hay una cláusula INHERITS
-                    parent_class_name = ctx.TYPE_ID(
-                        1
-                    ).getText()  # Nombre de la clase padre
-                    self.semantic_errors.append(
-                        f"Error en línea {ctx.start.line}: La clase Main no puede heredar de {parent_class_name}."
-                    )
-                    return  # Retorna inmediatamente después de agregar el error semántico
-                self.main_found = True
+        class_name = ctx.TYPE_ID()[0].getText()
+        self.current_scope = class_name  # Establecer current_scope una vez
 
-            symbol = Symbol(
-                name=type_id,
-                type="ClassType",
-                scope=self.current_scope,
-                lexeme=type_id,
-                token="ClassType",
-                memory_pos=self.current_memory_position,
-                line_num=ctx.start.line,
-                line_pos=ctx.start.column,
-                semantic_type="ClassType",
-                num_params=0,
-                param_types=[],
-                pass_method="byValue",
-                byte_size=0,
-            )
-            self.symbol_table.add_symbol(symbol)
-            self.current_memory_position += 1
-            self.table.append(list(symbol.__dict__.values()))
-        self.current_scope = type_ids[0].getText()
-        visited_classes = set()
+        # Verificación de la clase Main
+        if class_name == "Main":
+            if ctx.INHERITS():  # Verifica si hay una cláusula INHERITS
+                parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: La clase Main no puede heredar de {parent_class_name}."
+                )
+                return  # Retorna inmediatamente después de agregar el error semántico
+            self.main_found = True
+
+        # Creación del símbolo para la clase actual
+        symbol = Symbol(
+            name=class_name,
+            type="ClassType",
+            scope=self.current_scope,
+            lexeme=class_name,
+            token="ClassType",
+            memory_pos=self.current_memory_position,
+            line_num=ctx.start.line,
+            line_pos=ctx.start.column,
+            semantic_type="ClassType",
+            num_params=0,
+            param_types=[],
+            pass_method="byValue",
+            byte_size=0,
+        )
+        self.symbol_table.add_symbol(symbol)
+        self.current_memory_position += 1
+        self.table.append(list(symbol.__dict__.values()))
+
         parent_class_name = None
+        visited_classes = set()
 
-        class_name2 = ctx.TYPE_ID()[0].getText()
         # Si la clase tiene una clase padre (por la presencia de INHERITS)
         if ctx.INHERITS():
-
-            parent_class_name = (
-                ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None
-            )  # Verificación añadida aquí
-            visited_classes.add(class_name)
-
-            visited_classes = set()
-            visited_classes.add(class_name2)  # Añade el nombre de la clase actual
+            parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None
+            visited_classes.add(class_name)  # Añade el nombre de la clase actual
 
             while parent_class_name:
                 if parent_class_name in visited_classes:
@@ -542,22 +533,22 @@ class MyYAPLListener(YAPLListener):
                     )
                     return
                 visited_classes.add(parent_class_name)
-                parent_symbol = self.symbol_table.get_symbol(
-                    parent_class_name, "ClassType"
-                )
-                parent_class_name = (
-                    parent_symbol.parent_class_name if parent_symbol else None
-                )  # Aquí es donde actualizas el parent_class_name
+                parent_symbol = self.symbol_table.get_symbol(parent_class_name, "ClassType")
+                parent_class_name = parent_symbol.parent_class_name if parent_symbol else None
 
             # Añadir las variables y métodos de la clase base al alcance actual
             for symbol in self.symbol_table.symbols:
-                if symbol.scope == parent_class_name:
+                if symbol.scope == parent_class_name and symbol.name not in self.symbol_table.symbols_names_in_scope(class_name):
                     inherited_symbol = deepcopy(symbol)
-                    inherited_symbol.scope = class_name2
+                    inherited_symbol.scope = class_name
                     self.symbol_table.add_symbol(inherited_symbol)
 
             # Añadir la relación de herencia
-            self.symbol_table.add_inheritance(class_name2, parent_class_name)
+            self.symbol_table.add_inheritance(class_name, parent_class_name)
+
+            # Añade el tamaño total de la clase padre al tamaño de la clase derivada
+            total_parent_size = self.symbol_table.get_total_class_size(parent_class_name)
+            self.symbol_table.update_class_size(class_name, total_parent_size)
 
     def exitClassDef(self, ctx):
         self.current_scope = "global"
