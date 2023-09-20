@@ -18,22 +18,39 @@ from tkinter import filedialog, messagebox, Text, simpledialog
 text_editor = None
 console = None
 # Se crear el el GUI el espacio del editor de texto
-def initialize_text_editor(root, content):
-    global text_editor
+def redraw_line_numbers(canvas, text_widget):
+    canvas.delete("all")  # limpiamos todo lo que estaba dibujado anteriormente
 
-    # Crear el botón y agregarlo a la interfaz
-    execute_button = tk.Button(
-        root, text="Ejecutar Validaciones", command=execute_functions
-    )
+    i = text_widget.index("@0,0")
+    while True:
+        dline = text_widget.dlineinfo(i)
+        if dline is None: 
+            break
+        y = dline[1]
+        linenum = str(i).split(".")[0]
+        canvas.create_text(2, y, anchor="nw", text=linenum, fill="black")
+        i = text_widget.index("%s+1line" % i)
+
+def initialize_text_editor(root, content):
+    global text_editor, line_numbers_canvas
+
+    execute_button = tk.Button(root, text="Ejecutar Validaciones", command=execute_functions)
     execute_button.pack(pady=10)
 
-    # Crear el editor de texto y llenarlo con el contenido del archivo
-    text_editor = Text(root, wrap=tk.WORD)
-    text_editor.insert(tk.END, content)
-    text_editor.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
+    editor_frame = tk.Frame(root)
+    editor_frame.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
 
-    # Asegurarse de que el text_editor esté en estado editable
-    text_editor.configure(state=tk.NORMAL)
+    line_numbers_canvas = tk.Canvas(editor_frame, width=30, bg='lightgrey')
+    line_numbers_canvas.pack(side=tk.LEFT, fill=tk.Y)
+
+    text_editor = Text(editor_frame, wrap=tk.WORD)
+    text_editor.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH)
+    text_editor.insert(tk.END, content)
+
+    text_editor.bind("<KeyRelease>", lambda event: redraw_line_numbers(line_numbers_canvas, text_editor))
+    text_editor.bind("<MouseWheel>", lambda event: redraw_line_numbers(line_numbers_canvas, text_editor))
+    redraw_line_numbers(line_numbers_canvas, text_editor)  # Inicializar números de línea
+
 
 
 # Se crea en el GUI la ventana que permite al usuario seleccionar un archivo
@@ -79,8 +96,24 @@ def on_closing(root):
 # Se crea la consola del GUI
 def initialize_console(root):
     global console
-    console = tk.Text(root, bg="black", fg="white", wrap=tk.WORD)
-    console.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
+
+    # 1. Crea un frame que contenga tanto al widget Text como al Scrollbar.
+    frame = tk.Frame(root)
+    frame.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
+
+    # 2. Crear el Scrollbar horizontal.
+    h_scroll = tk.Scrollbar(frame, orient=tk.HORIZONTAL)
+
+    # 3. Crear el widget Text y configurarlo para usar el Scrollbar.
+    console = tk.Text(frame, bg="black", fg="white", wrap=tk.NONE, xscrollcommand=h_scroll.set)
+
+    # 4. Configurar el Scrollbar para comunicarse con el widget Text.
+    h_scroll.config(command=console.xview)
+
+    # 5. Empaquetar el widget Text y el Scrollbar en el frame.
+    console.pack(expand=True, fill=tk.BOTH)  # Nota que eliminamos 'side=tk.LEFT'
+    h_scroll.pack(fill=tk.X)  # Nota que también eliminamos 'side=tk.BOTTOM'
+
 
 
 # Redirigir lo que normalmente se imprime en la consola de visual al programa con GUI
@@ -266,6 +299,7 @@ class Symbol:
         num_params,
         param_types,
         pass_method,
+        parent_class=None,
         default_value=None,
         byte_size=None,
     ):
@@ -281,6 +315,7 @@ class Symbol:
         self.num_params = num_params
         self.param_types = param_types
         self.pass_method = pass_method
+        self.parent_class=parent_class
         self.default_value = default_value
         self.byte_size = byte_size
 
@@ -311,9 +346,9 @@ class SymbolTable:
             "Line Num",
             "Line Pos",
             "Semantic Type",
-            "Num Params",
             "Param Types",
             "Pass Method",
+            "Parent Class",
             "Default Value",
             "Byte Size",
         ]
@@ -488,6 +523,7 @@ class MyYAPLListener(YAPLListener):
         class_name = ctx.TYPE_ID()[0].getText()
         self.current_scope = class_name  # Establecer current_scope una vez
 
+        parent_class_name = None
         # Verificación de la clase Main
         if class_name == "Main":
             if ctx.INHERITS():  # Verifica si hay una cláusula INHERITS
@@ -513,6 +549,7 @@ class MyYAPLListener(YAPLListener):
             param_types=[],
             pass_method="byValue",
             byte_size=0,
+            parent_class=parent_class_name
         )
         self.symbol_table.add_symbol(symbol)
         self.current_memory_position += 1
@@ -521,7 +558,7 @@ class MyYAPLListener(YAPLListener):
         parent_class_name = None
         visited_classes = set()
 
-        # Si la clase tiene una clase padre (por la presencia de INHERITS)
+        # Si la clase tiene una clase padre (por la presencia de INHERITS
         if ctx.INHERITS():
             parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None
             visited_classes.add(class_name)  # Añade el nombre de la clase actual
