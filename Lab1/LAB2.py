@@ -405,6 +405,9 @@ class SymbolTable:
             subtype = self.class_inheritance[subtype]
         return False
 
+
+    #-------------------------Funciones para controlar herencia--------------------------------------    
+
     def get_symbol_with_inheritance(self, name, scope):
         # Verifica primero en el alcance dado
         for symbol in self.symbols:
@@ -423,6 +426,14 @@ class SymbolTable:
     def get_parent_class(self, class_name):
         """Devuelve el nombre de la clase padre de class_name, si es que tiene una."""
         return self.class_inheritance.get(class_name, None)
+    
+    def get_class_size(self, class_name):
+        """Obtiene el tamaño de una clase específica, sin incluir el tamaño de sus clases padre."""
+        for symbol in self.symbols:
+            if symbol.name == class_name and symbol.type == "ClassType":
+                return symbol.byte_size
+        return 0  # Retorna 0 si no se encuentra la clase
+
     
     def get_total_class_size(self, class_name):
         """Obtiene el tamaño total de una clase, incluyendo el tamaño de sus clases padre."""
@@ -447,7 +458,7 @@ class SymbolTable:
                 # Sumar el added_size
                 symbol.byte_size += added_size
                 # Agregar el tamaño de la clase base si está heredando de alguna
-                if class_to_update in self.class_inheritance:
+                if class_to_update in self.class_inheritance and symbol.byte_size is not None:
                     base_class_name = self.class_inheritance[class_to_update]
                     base_class_size = self.get_total_class_size(base_class_name)
                     symbol.byte_size += base_class_size
@@ -476,7 +487,7 @@ class SymbolTable:
                     symbol.byte_size = 0
                 symbol.byte_size += base_class_size
                 break
-
+    #-------------------------Termina funciones para controlar herencia--------------------------------------    
 
 # -------------------------Fin declaraciones tabla de simbolos------------------------------------------
 
@@ -560,7 +571,8 @@ class MyYAPLListener(YAPLListener):
 
         # Si la clase tiene una clase padre (por la presencia de INHERITS
         if ctx.INHERITS():
-            parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None
+            original_parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None
+            parent_class_name = original_parent_class_name
             visited_classes.add(class_name)  # Añade el nombre de la clase actual
 
             while parent_class_name:
@@ -573,34 +585,36 @@ class MyYAPLListener(YAPLListener):
                 parent_symbol = self.symbol_table.get_symbol(parent_class_name, "ClassType")
                 parent_class_name = parent_symbol.parent_class_name if parent_symbol else None
 
-            # Añadir las variables y métodos de la clase base al alcance actual
-            for symbol in self.symbol_table.symbols:
-                if symbol.scope == parent_class_name and symbol.name not in self.symbol_table.symbols_names_in_scope(class_name):
-                    inherited_symbol = deepcopy(symbol)
-                    inherited_symbol.scope = class_name
-                    self.symbol_table.add_symbol(inherited_symbol)
-
             # Añadir la relación de herencia
-            self.symbol_table.add_inheritance(class_name, parent_class_name)
+            self.symbol_table.add_inheritance(class_name, original_parent_class_name)
 
             # Añade el tamaño total de la clase padre al tamaño de la clase derivada
-            total_parent_size = self.symbol_table.get_total_class_size(parent_class_name)
-            self.symbol_table.update_class_size(class_name, total_parent_size)
+            class_symbol = self.symbol_table.get_symbol(class_name, class_name)
+            if class_symbol:
+                class_symbol.byte_size = self.symbol_table.get_total_class_size(original_parent_class_name)
+
+            # Se añade al atributo parent class el nombre de la clase padre
+            # Buscar el símbolo de la clase hija en la tabla de símbolos
+            derived_symbol = self.symbol_table.get_symbol(class_name, class_name)
+            if derived_symbol:
+                derived_symbol.parent_class = original_parent_class_name
+
+
 
     def exitClassDef(self, ctx):
         self.current_scope = "global"
 
     def enterFeature(self, ctx):
-        # print("Entrando a enterFeature")  # Debugging
-
         self.has_attribute = True
-        object_ids = (
-            ctx.OBJECT_ID() if isinstance(ctx.OBJECT_ID(), list) else [ctx.OBJECT_ID()]
-        )
+
+        # Obteniendo los object_ids y type_ids
+        object_ids = ctx.OBJECT_ID() if isinstance(ctx.OBJECT_ID(), list) else [ctx.OBJECT_ID()]
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
+
         method_name = object_ids[0].getText() if object_ids else None
         class_name = self.current_scope
 
+        # Verificación para la clase Main y método main
         if class_name == "Main" and method_name == "main":
             self.main_method_in_main_found = True
             formals = ctx.formals()
@@ -609,40 +623,24 @@ class MyYAPLListener(YAPLListener):
                 self.semantic_errors.append(
                     "Error: el método main en la clase Main no debe tener parámetros."
                 )
-                # print("Saliendo tempranamente debido a formals")  # Debugging
                 return
 
         for object_id, type_id in zip(object_ids, type_ids):
             object_id = object_id.getText()
             type_id = type_id.getText()
-            # valores default
+
+            # Estableciendo valores default y el tamaño en bytes
             default_value = None
+            feature_byte_size = self.type_size_map.get(type_id, 0)
+
             if type_id == "Int":
                 default_value = 0
-                byte_size = 4  # agrgando los tamaños, 4 bytes
             elif type_id == "String":
                 default_value = ""
-                # Estableciendo el tamaño máximo en bytes para un String
-                max_length = 256
-                # Asignando el tamaño máximo a byte_size
-                byte_size = max_length
             elif type_id == "Bool":
                 default_value = False
-                byte_size = 1  # agrgando los tamaños, 4 bytes
 
-            self.symbol_table.update_class_size(self.current_scope, byte_size)
-
-            if self.symbol_table.symbol_exists_with_inheritance(
-                object_id, self.current_scope
-            ):
-                self.semantic_errors.append(
-                    f"Error en línea {ctx.start.line}: La variable o método {object_id} no puede ser sobrescrito en la clase hija."
-                )
-                # print(
-                #     f"Saliendo tempranamente debido al símbolo {object_id}"
-                # )  # Debugging
-                return
-
+            # Creación del símbolo de la característica
             symbol = Symbol(
                 name=object_id,
                 type="Feature",
@@ -657,37 +655,28 @@ class MyYAPLListener(YAPLListener):
                 param_types=[],
                 pass_method="byValue",
                 default_value=default_value,
-                byte_size=byte_size,
+                byte_size=feature_byte_size,
             )
 
-            if self.symbol_table.symbol_exists(object_id, self.current_scope):
+            if self.symbol_table.symbol_exists(object_id, self.current_scope) or \
+                    self.symbol_table.symbol_exists_with_inheritance(object_id, self.current_scope):
                 self.semantic_errors.append(
-                    f"Error en línea {ctx.start.line}: La variable {object_id} ya ha sido declarada en este ámbito."
+                    f"Error en línea {ctx.start.line}: La variable o método {object_id} ya ha sido declarada en este ámbito o una clase base."
                 )
-                # print(
-                #     f"Saliendo tempranamente debido al símbolo {object_id}"
-                # )  # Debugging
                 return
 
             self.symbol_table.add_symbol(symbol)
             self.current_memory_position += 1
             self.table.append(list(symbol.__dict__.values()))
 
-        for object_id in object_ids:
-            object_id = object_id.getText()
-
-            if not self.symbol_table.symbol_exists(object_id, self.current_scope):
-                self.semantic_errors.append(
-                    f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración."
-                )
-                # print(
-                #     f"Saliendo tempranamente debido al símbolo {object_id}"
-                # )  # Debugging
-                return
-
-        # print de valores default
+            # Añadir el tamaño de la nueva característica a la clase
+            class_symbol = self.symbol_table.get_symbol(self.current_scope, self.current_scope)
+            if class_symbol:
+                if class_symbol.byte_size is None:
+                    class_symbol.byte_size = 0
+                class_symbol.byte_size += feature_byte_size
         self.symbol_table.print_table()
-        # print("Saliendo de enterFeature")  # Debugging
+
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
 
