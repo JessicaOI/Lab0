@@ -1,0 +1,3 @@
+= "true branch" None -> var2
+= var2 None -> "false branch"
+return var2 None -> None

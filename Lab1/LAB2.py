@@ -24,33 +24,43 @@ def redraw_line_numbers(canvas, text_widget):
     i = text_widget.index("@0,0")
     while True:
         dline = text_widget.dlineinfo(i)
-        if dline is None: 
+        if dline is None:
             break
         y = dline[1]
         linenum = str(i).split(".")[0]
         canvas.create_text(2, y, anchor="nw", text=linenum, fill="black")
         i = text_widget.index("%s+1line" % i)
 
+
 def initialize_text_editor(root, content):
     global text_editor, line_numbers_canvas
 
-    execute_button = tk.Button(root, text="Ejecutar Validaciones", command=execute_functions)
+    execute_button = tk.Button(
+        root, text="Ejecutar Validaciones", command=execute_functions
+    )
     execute_button.pack(pady=10)
 
     editor_frame = tk.Frame(root)
     editor_frame.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
 
-    line_numbers_canvas = tk.Canvas(editor_frame, width=30, bg='lightgrey')
+    line_numbers_canvas = tk.Canvas(editor_frame, width=30, bg="lightgrey")
     line_numbers_canvas.pack(side=tk.LEFT, fill=tk.Y)
 
     text_editor = Text(editor_frame, wrap=tk.WORD)
     text_editor.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH)
     text_editor.insert(tk.END, content)
 
-    text_editor.bind("<KeyRelease>", lambda event: redraw_line_numbers(line_numbers_canvas, text_editor))
-    text_editor.bind("<MouseWheel>", lambda event: redraw_line_numbers(line_numbers_canvas, text_editor))
-    redraw_line_numbers(line_numbers_canvas, text_editor)  # Inicializar números de línea
-
+    text_editor.bind(
+        "<KeyRelease>",
+        lambda event: redraw_line_numbers(line_numbers_canvas, text_editor),
+    )
+    text_editor.bind(
+        "<MouseWheel>",
+        lambda event: redraw_line_numbers(line_numbers_canvas, text_editor),
+    )
+    redraw_line_numbers(
+        line_numbers_canvas, text_editor
+    )  # Inicializar números de línea
 
 
 # Se crea en el GUI la ventana que permite al usuario seleccionar un archivo
@@ -93,6 +103,11 @@ def on_closing(root):
         root.destroy()
 
 
+def save_to_file(codigo_intermedio, filename="codigo_intermedio.txt"):
+    with open(filename, "w") as file:
+        file.write(codigo_intermedio)
+
+
 # Se crea la consola del GUI
 def initialize_console(root):
     global console
@@ -105,7 +120,9 @@ def initialize_console(root):
     h_scroll = tk.Scrollbar(frame, orient=tk.HORIZONTAL)
 
     # 3. Crear el widget Text y configurarlo para usar el Scrollbar.
-    console = tk.Text(frame, bg="black", fg="white", wrap=tk.NONE, xscrollcommand=h_scroll.set)
+    console = tk.Text(
+        frame, bg="black", fg="white", wrap=tk.NONE, xscrollcommand=h_scroll.set
+    )
 
     # 4. Configurar el Scrollbar para comunicarse con el widget Text.
     h_scroll.config(command=console.xview)
@@ -113,7 +130,6 @@ def initialize_console(root):
     # 5. Empaquetar el widget Text y el Scrollbar en el frame.
     console.pack(expand=True, fill=tk.BOTH)  # Nota que eliminamos 'side=tk.LEFT'
     h_scroll.pack(fill=tk.X)  # Nota que también eliminamos 'side=tk.BOTTOM'
-
 
 
 # Redirigir lo que normalmente se imprime en la consola de visual al programa con GUI
@@ -166,6 +182,16 @@ def execute_functions():
             print("Error Semántico: " + error)
 
         print("Finalizando el programa.")
+
+    # Usando el Generador
+    generador = GeneradorCodigoIntermedio()
+    walker.walk(
+        generador, tree
+    )  # Utilizamos el walker con el GeneradorCodigoIntermedio
+    codigo_intermedio = generador.get_codigo_intermedio()
+
+    # Guarda el código intermedio en un archivo
+    save_to_file(codigo_intermedio)
 
 
 # -------------------------------------Fin GUI------------------------------------
@@ -315,7 +341,7 @@ class Symbol:
         self.num_params = num_params
         self.param_types = param_types
         self.pass_method = pass_method
-        self.parent_class=parent_class
+        self.parent_class = parent_class
         self.default_value = default_value
         self.byte_size = byte_size
 
@@ -405,8 +431,7 @@ class SymbolTable:
             subtype = self.class_inheritance[subtype]
         return False
 
-
-    #-------------------------Funciones para controlar herencia--------------------------------------    
+    # -------------------------Funciones para controlar herencia--------------------------------------
 
     def get_symbol_with_inheritance(self, name, scope):
         # Verifica primero en el alcance dado
@@ -426,7 +451,7 @@ class SymbolTable:
     def get_parent_class(self, class_name):
         """Devuelve el nombre de la clase padre de class_name, si es que tiene una."""
         return self.class_inheritance.get(class_name, None)
-    
+
     def get_class_size(self, class_name):
         """Obtiene el tamaño de una clase específica, sin incluir el tamaño de sus clases padre."""
         for symbol in self.symbols:
@@ -434,7 +459,6 @@ class SymbolTable:
                 return symbol.byte_size
         return 0  # Retorna 0 si no se encuentra la clase
 
-    
     def get_total_class_size(self, class_name):
         """Obtiene el tamaño total de una clase, incluyendo el tamaño de sus clases padre."""
         total_size = 0
@@ -450,7 +474,14 @@ class SymbolTable:
 
         for class_to_update in classes_to_update:
             # Buscar el símbolo en la lista symbols
-            symbol = next((s for s in self.symbols if s.name == class_to_update and s.type == "ClassType"), None)
+            symbol = next(
+                (
+                    s
+                    for s in self.symbols
+                    if s.name == class_to_update and s.type == "ClassType"
+                ),
+                None,
+            )
             if symbol:
                 # Inicializar el byte_size si es None
                 if symbol.byte_size is None:
@@ -458,11 +489,13 @@ class SymbolTable:
                 # Sumar el added_size
                 symbol.byte_size += added_size
                 # Agregar el tamaño de la clase base si está heredando de alguna
-                if class_to_update in self.class_inheritance and symbol.byte_size is not None:
+                if (
+                    class_to_update in self.class_inheritance
+                    and symbol.byte_size is not None
+                ):
                     base_class_name = self.class_inheritance[class_to_update]
                     base_class_size = self.get_total_class_size(base_class_name)
                     symbol.byte_size += base_class_size
-
 
     def get_derived_classes(self, base_class):
         return [
@@ -487,7 +520,9 @@ class SymbolTable:
                     symbol.byte_size = 0
                 symbol.byte_size += base_class_size
                 break
-    #-------------------------Termina funciones para controlar herencia--------------------------------------    
+
+    # -------------------------Termina funciones para controlar herencia--------------------------------------
+
 
 # -------------------------Fin declaraciones tabla de simbolos------------------------------------------
 
@@ -560,7 +595,7 @@ class MyYAPLListener(YAPLListener):
             param_types=[],
             pass_method="byValue",
             byte_size=0,
-            parent_class=parent_class_name
+            parent_class=parent_class_name,
         )
         self.symbol_table.add_symbol(symbol)
         self.current_memory_position += 1
@@ -571,7 +606,9 @@ class MyYAPLListener(YAPLListener):
 
         # Si la clase tiene una clase padre (por la presencia de INHERITS
         if ctx.INHERITS():
-            original_parent_class_name = ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None
+            original_parent_class_name = (
+                ctx.TYPE_ID(1).getText() if ctx.TYPE_ID(1) else None
+            )
             parent_class_name = original_parent_class_name
             visited_classes.add(class_name)  # Añade el nombre de la clase actual
 
@@ -582,8 +619,12 @@ class MyYAPLListener(YAPLListener):
                     )
                     return
                 visited_classes.add(parent_class_name)
-                parent_symbol = self.symbol_table.get_symbol(parent_class_name, "ClassType")
-                parent_class_name = parent_symbol.parent_class_name if parent_symbol else None
+                parent_symbol = self.symbol_table.get_symbol(
+                    parent_class_name, "ClassType"
+                )
+                parent_class_name = (
+                    parent_symbol.parent_class_name if parent_symbol else None
+                )
 
             # Añadir la relación de herencia
             self.symbol_table.add_inheritance(class_name, original_parent_class_name)
@@ -591,15 +632,15 @@ class MyYAPLListener(YAPLListener):
             # Añade el tamaño total de la clase padre al tamaño de la clase derivada
             class_symbol = self.symbol_table.get_symbol(class_name, class_name)
             if class_symbol:
-                class_symbol.byte_size = self.symbol_table.get_total_class_size(original_parent_class_name)
+                class_symbol.byte_size = self.symbol_table.get_total_class_size(
+                    original_parent_class_name
+                )
 
             # Se añade al atributo parent class el nombre de la clase padre
             # Buscar el símbolo de la clase hija en la tabla de símbolos
             derived_symbol = self.symbol_table.get_symbol(class_name, class_name)
             if derived_symbol:
                 derived_symbol.parent_class = original_parent_class_name
-
-
 
     def exitClassDef(self, ctx):
         self.current_scope = "global"
@@ -608,7 +649,9 @@ class MyYAPLListener(YAPLListener):
         self.has_attribute = True
 
         # Obteniendo los object_ids y type_ids
-        object_ids = ctx.OBJECT_ID() if isinstance(ctx.OBJECT_ID(), list) else [ctx.OBJECT_ID()]
+        object_ids = (
+            ctx.OBJECT_ID() if isinstance(ctx.OBJECT_ID(), list) else [ctx.OBJECT_ID()]
+        )
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
 
         method_name = object_ids[0].getText() if object_ids else None
@@ -658,8 +701,11 @@ class MyYAPLListener(YAPLListener):
                 byte_size=feature_byte_size,
             )
 
-            if self.symbol_table.symbol_exists(object_id, self.current_scope) or \
-                    self.symbol_table.symbol_exists_with_inheritance(object_id, self.current_scope):
+            if self.symbol_table.symbol_exists(
+                object_id, self.current_scope
+            ) or self.symbol_table.symbol_exists_with_inheritance(
+                object_id, self.current_scope
+            ):
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: La variable o método {object_id} ya ha sido declarada en este ámbito o una clase base."
                 )
@@ -670,13 +716,14 @@ class MyYAPLListener(YAPLListener):
             self.table.append(list(symbol.__dict__.values()))
 
             # Añadir el tamaño de la nueva característica a la clase
-            class_symbol = self.symbol_table.get_symbol(self.current_scope, self.current_scope)
+            class_symbol = self.symbol_table.get_symbol(
+                self.current_scope, self.current_scope
+            )
             if class_symbol:
                 if class_symbol.byte_size is None:
                     class_symbol.byte_size = 0
                 class_symbol.byte_size += feature_byte_size
         self.symbol_table.print_table()
-
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
 
@@ -935,6 +982,130 @@ class MyYAPLListener(YAPLListener):
 
         # --------Imprimir tabla de simbolos--------
         # print(tabulate(self.table, headers=headers, tablefmt="pretty"))
+
+
+class Cuadruplo:
+    def __init__(self, operador, arg1=None, arg2=None, destino=None):
+        self.operador = operador
+        self.arg1 = arg1
+        self.arg2 = arg2
+        self.destino = destino
+
+    def __str__(self):
+        return f"{self.operador} {self.arg1} {self.arg2} -> {self.destino}"
+
+
+# Asumiendo que tus importaciones están correctas y que tienes la definición de la clase Cuadruplo
+
+
+class GeneradorCodigoIntermedio(YAPLListener):
+    def __init__(self):
+        self.temp_counter = 0
+        self.label_counter = 0
+        self.cuadruplos = []
+        self.current_scope = "global"
+        self.scopes = {"global": {}}
+
+    def new_temp(self):
+        self.temp_counter += 1
+        return f"t{self.temp_counter}"
+
+    def new_label(self):
+        self.label_counter += 1
+        return f"L{self.label_counter}"
+
+    def enter_scope(self, scope_name):
+        self.current_scope = scope_name
+        self.scopes[scope_name] = {}
+
+    def exit_scope(self):
+        self.current_scope = "global"
+
+    def enterClassDef(self, ctx: YAPLParser.ClassDefContext):
+        class_name = ctx.TYPE_ID()[0].getText()
+        self.enter_scope(class_name)
+
+    def exitClassDef(self, ctx: YAPLParser.ClassDefContext):
+        self.exit_scope()
+
+    def enterFeature(self, ctx: YAPLParser.FeatureContext):
+        if ctx.OBJECT_ID() and ctx.COLON():
+            var_name = ctx.OBJECT_ID().getText()
+            self.scopes[self.current_scope][var_name] = None
+        elif ctx.OBJECT_ID() and ctx.LPAREN():
+            func_name = ctx.OBJECT_ID().getText()
+            self.enter_scope(func_name)
+
+    def exitFeature(self, ctx: YAPLParser.FeatureContext):
+        if ctx.OBJECT_ID() and ctx.LPAREN():
+            self.exit_scope()
+
+    def enterExpressionStatement(self, ctx: YAPLParser.ExpressionStatementContext):
+        var_name = ctx.OBJECT_ID().getText()
+        value = (
+            ctx.expression().getText()
+        )  # Asumiendo que esto devuelve el resultado de la expresión
+
+        # Si el valor es un temporal (e.g., t1), asignarlo directamente
+        if "t" in value:
+            self.cuadruplos.append(Cuadruplo("=", value, None, var_name))
+        else:
+            temp = self.new_temp()
+            self.cuadruplos.append(Cuadruplo("=", var_name, None, value))
+
+    def enterReturnStatement(self, ctx: YAPLParser.ReturnStatementContext):
+        value = ctx.expression().getText()
+        self.cuadruplos.append(Cuadruplo("return", value, None, None))
+
+    def enterStatement(self, ctx: YAPLParser.StatementContext):
+        # IF statement
+        if hasattr(ctx, "IF") and ctx.IF():
+            temp = self.new_temp()
+            condition = ctx.expression(0).getText()
+            self.cuadruplos.append(Cuadruplo("=", condition, None, temp))
+            label_true = self.new_label()
+            label_false = self.new_label()
+            label_end = self.new_label()
+            self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_false))
+            # Aquí se generarían cuádruplos para las instrucciones dentro del "then"
+            # self.cuadruplos.append(...)
+            self.cuadruplos.append(Cuadruplo("goto", None, None, label_end))
+            self.cuadruplos.append(Cuadruplo("label:", label_false, None, None))
+            # Aquí se generarían cuádruplos para las instrucciones dentro del "else"
+            # self.cuadruplos.append(...)
+            self.cuadruplos.append(Cuadruplo("label:", label_end, None, None))
+
+        # WHILE statement
+        elif hasattr(ctx, "WHILE") and ctx.WHILE():
+            label_start = self.new_label()
+            temp = self.new_temp()
+            condition = ctx.expression().getText()
+            self.cuadruplos.append(Cuadruplo("=", condition, None, temp))
+            label_true = self.new_label()
+            label_end = self.new_label()
+            self.cuadruplos.append(Cuadruplo("label:", label_start, None, None))
+            self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_end))
+            self.cuadruplos.append(Cuadruplo("label:", label_true, None, None))
+            # Aquí se generarían cuádruplos para las instrucciones dentro del "loop"
+            # self.cuadruplos.append(...)
+            self.cuadruplos.append(Cuadruplo("goto", None, None, label_start))
+            self.cuadruplos.append(Cuadruplo("label:", label_end, None, None))
+
+    def enterExpression(self, ctx: YAPLParser.ExpressionContext):
+        if ctx.getChildCount() == 3 and ctx.expression(0) and ctx.expression(1):
+            left_expr = ctx.expression(0).getText()
+            right_expr = ctx.expression(1).getText()
+            operator = ctx.getChild(1).getText()
+
+            temp = self.new_temp()
+            self.cuadruplos.append(Cuadruplo(operator, left_expr, right_expr, temp))
+
+    def exitExpression(self, ctx: YAPLParser.ExpressionContext):
+        # Si hay lógica que necesita ejecutarse después de procesar toda la expresión, colócala aquí.
+        pass
+
+    def get_codigo_intermedio(self):
+        return "\n".join(str(cuad) for cuad in self.cuadruplos)
 
 
 # -------------------------Analisis Semantico---------------------------------------------
