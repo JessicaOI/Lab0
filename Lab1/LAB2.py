@@ -1005,6 +1005,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.in_if_block = False
         self.in_else_block = False
         self.label_stack = []
+        self.jump_stack = []
 
     def new_temp(self):
         self.temp_counter += 1
@@ -1027,58 +1028,45 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.cuadruplos.append(Cuadruplo("begin_class", class_name, "-", "-"))
 
     def exitClassDef(self, ctx: YAPLParser.ClassDefContext):
-        self.cuadruplos.append(Cuadruplo("end_class", self.current_scope, "-", "-"))
+        class_name = ctx.TYPE_ID()[0].getText()
+        self.cuadruplos.append(Cuadruplo("end_class", class_name, "-", "-"))
         self.exit_scope()
 
     def enterFeature(self, ctx: YAPLParser.FeatureContext):
         if ctx.OBJECT_ID() and ctx.COLON():
             var_name = ctx.OBJECT_ID().getText()
             self.scopes[self.current_scope][var_name] = None
-            # Agregar cuádruplo para declaración de variable
-            self.cuadruplos.append(Cuadruplo("=", None, None, var_name))
-        elif ctx.OBJECT_ID() and ctx.LPAREN():
+            # No generamos cuadruplo de inicialización aquí.
+        elif ctx.OBJECT_ID() and ctx.LPAREN() and not ctx.RPAREN():
             func_name = ctx.OBJECT_ID().getText()
             self.enter_scope(func_name)
-            # Se eliminó el cuádruplo de inicialización para métodos
+            self.cuadruplos.append(Cuadruplo("begin_method", func_name, "-", "-"))
 
     def exitFeature(self, ctx: YAPLParser.FeatureContext):
         if ctx.OBJECT_ID() and ctx.LPAREN():
-            self.cuadruplos.append(
-                Cuadruplo("end_method", self.current_scope, "-", "-")
-            )
+            func_name = ctx.OBJECT_ID().getText()
+            self.cuadruplos.append(Cuadruplo("end_method", func_name, "-", "-"))
             self.exit_scope()
 
     def enterExpressionStatement(self, ctx: YAPLParser.ExpressionStatementContext):
-        var_name = ctx.OBJECT_ID().getText()
-        value = ctx.expression().getText()
-
-        if not self.in_else_block:  # Si no estamos en una rama else
-            if not any(
-                c
-                for c in self.cuadruplos
-                if c.operador == "=" and c.destino == var_name and c.arg1 == value
-            ):
-                self.cuadruplos.append(Cuadruplo("=", value, None, var_name))
+        if not self.in_if_block and not self.in_else_block:
+            var_name = ctx.OBJECT_ID().getText()
+            value = ctx.expression().getText()
+            self.cuadruplos.append(Cuadruplo("=", value, None, var_name))
 
     def enterReturnStatement(self, ctx: YAPLParser.ReturnStatementContext):
         value = ctx.expression().getText()
         self.cuadruplos.append(Cuadruplo("return", value, None, None))
 
     def has_else_block(self, ctx):
-        for child in ctx.getChildren():
-            if child.getText() == "else":
-                return True
-        return False
+        return any(child.getText() == "else" for child in ctx.getChildren())
 
     def enterStatement(self, ctx: YAPLParser.StatementContext):
         first_child = ctx.getChild(0).getText()
 
-        if first_child == "if":
-            self.in_if_block = True
-        elif first_child == "else":
+        if first_child == "else":
             self.in_else_block = True
-
-        if first_child == "if":
+        elif first_child == "if":
             self.in_if_block = True
 
             # Evaluación de la condición
@@ -1087,11 +1075,14 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.cuadruplos.append(Cuadruplo("=", condition, None, temp))
 
             # Etiquetas para el flujo de control
+            label_else = self.new_label() if self.has_else_block(ctx) else None
             label_end = self.new_label()
-            label_else = self.new_label() if self.has_else_block(ctx) else label_end
+
             self.label_stack.append((label_else, label_end))
 
-            self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_else))
+            self.cuadruplos.append(
+                Cuadruplo("if_false", temp, None, label_else or label_end)
+            )
 
         elif first_child == "while":
             label_start = self.new_label()
@@ -1110,17 +1101,31 @@ class GeneradorCodigoIntermedio(YAPLListener):
         first_child = ctx.getChild(0).getText()
 
         if first_child == "if":
-            self.in_if_block = False
+            label_else, label_end = self.label_stack[
+                -1
+            ]  # Vemos la última etiqueta agregada pero no la eliminamos aún
 
-            # Esta condición asegura que el bloque 'else' generará el salto adecuado y etiquetas
-            if self.has_else_block(ctx):
-                label_else, label_end = self.label_stack[-1]
-                self.cuadruplos.append(Cuadruplo("goto", None, None, label_end))
-                self.cuadruplos.append(Cuadruplo("label", None, None, label_else))
+            if label_else:  # Si hay una rama else
+                self.cuadruplos.append(
+                    Cuadruplo("goto", None, None, label_end)
+                )  # Salto al final después de la rama verdadera
+                self.cuadruplos.append(
+                    Cuadruplo("label", None, None, label_else)
+                )  # Etiqueta de inicio de la rama else
+
+            else:  # Si no hay rama else
+                self.cuadruplos.append(
+                    Cuadruplo("label", None, None, label_end)
+                )  # Solo etiqueta del final
 
         elif first_child == "else":
-            _, label_end = self.label_stack.pop()
-            self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
+            (
+                _,
+                label_end,
+            ) = self.label_stack.pop()  # Ahora sí eliminamos la última etiqueta
+            self.cuadruplos.append(
+                Cuadruplo("label", None, None, label_end)
+            )  # Etiqueta del final
             self.in_else_block = False
             self.in_if_block = False
 
@@ -1135,10 +1140,6 @@ class GeneradorCodigoIntermedio(YAPLListener):
             operator = ctx.getChild(1).getText()
             temp = self.new_temp()
             self.cuadruplos.append(Cuadruplo(operator, left_expr, right_expr, temp))
-
-    def exitExpression(self, ctx: YAPLParser.ExpressionContext):
-        # Si hay lógica que necesita ejecutarse después de procesar toda la expresión, colócala aquí.
-        pass
 
     def get_codigo_intermedio(self):
         return "\n".join(str(cuad) for cuad in self.cuadruplos)

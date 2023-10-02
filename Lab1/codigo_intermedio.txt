@@ -1,26 +1,17 @@
 begin_class Main - -> -
-= None None -> var1
-= None None -> var2
-= None None -> main
 = var1 None -> t1
-if_false t1 None -> L2
-= "true branch" None -> var2
-= "false branch" None -> var2
-goto None None -> L1
-label None None -> L2
+if_false t1 None -> L1
+goto None None -> L2
+label None None -> L1
 return var2 None -> None
-end_method Main - -> -
-end_class global - -> -
+end_method main - -> -
+end_class Main - -> -
 begin_class SecondClass - -> -
-= None None -> var3
-= None None -> var4
-= None None -> secondMethod
 label None None -> L3
 = var3 None -> t2
 if_false t2 None -> L4
-= 1 None -> var4
 goto None None -> L3
 label None None -> L4
 return var4 None -> None
-end_method SecondClass - -> -
-end_class global - -> -
+end_method secondMethod - -> -
+end_class SecondClass - -> -
