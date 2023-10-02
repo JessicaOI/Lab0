@@ -1002,6 +1002,9 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.cuadruplos = []
         self.current_scope = "global"
         self.scopes = {"global": {}}
+        self.in_if_block = False
+        self.in_else_block = False
+        self.label_stack = []
 
     def new_temp(self):
         self.temp_counter += 1
@@ -1036,7 +1039,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
         elif ctx.OBJECT_ID() and ctx.LPAREN():
             func_name = ctx.OBJECT_ID().getText()
             self.enter_scope(func_name)
-            self.cuadruplos.append(Cuadruplo("begin_method", func_name, "-", "-"))
+            # Se eliminó el cuádruplo de inicialización para métodos
 
     def exitFeature(self, ctx: YAPLParser.FeatureContext):
         if ctx.OBJECT_ID() and ctx.LPAREN():
@@ -1049,12 +1052,13 @@ class GeneradorCodigoIntermedio(YAPLListener):
         var_name = ctx.OBJECT_ID().getText()
         value = ctx.expression().getText()
 
-        if not any(
-            c
-            for c in self.cuadruplos
-            if c.operador == "=" and c.destino == var_name and c.arg1 == value
-        ):
-            self.cuadruplos.append(Cuadruplo("=", value, None, var_name))
+        if not self.in_else_block:  # Si no estamos en una rama else
+            if not any(
+                c
+                for c in self.cuadruplos
+                if c.operador == "=" and c.destino == var_name and c.arg1 == value
+            ):
+                self.cuadruplos.append(Cuadruplo("=", value, None, var_name))
 
     def enterReturnStatement(self, ctx: YAPLParser.ReturnStatementContext):
         value = ctx.expression().getText()
@@ -1070,19 +1074,24 @@ class GeneradorCodigoIntermedio(YAPLListener):
         first_child = ctx.getChild(0).getText()
 
         if first_child == "if":
+            self.in_if_block = True
+        elif first_child == "else":
+            self.in_else_block = True
+
+        if first_child == "if":
+            self.in_if_block = True
+
+            # Evaluación de la condición
             temp = self.new_temp()
             condition = ctx.expression().getText()
             self.cuadruplos.append(Cuadruplo("=", condition, None, temp))
 
+            # Etiquetas para el flujo de control
             label_end = self.new_label()
-            if self.has_else_block(ctx):  # Si hay un bloque else
-                label_else = self.new_label()
-                self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_else))
-                ctx.label_else = label_else  # guardar la etiqueta para uso posterior
-            else:
-                self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_end))
+            label_else = self.new_label() if self.has_else_block(ctx) else label_end
+            self.label_stack.append((label_else, label_end))
 
-            ctx.label_end = label_end
+            self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_else))
 
         elif first_child == "while":
             label_start = self.new_label()
@@ -1101,10 +1110,19 @@ class GeneradorCodigoIntermedio(YAPLListener):
         first_child = ctx.getChild(0).getText()
 
         if first_child == "if":
-            if self.has_else_block(ctx):  # Si hay un bloque else
-                self.cuadruplos.append(Cuadruplo("goto", None, None, ctx.label_end))
-                self.cuadruplos.append(Cuadruplo("label", None, None, ctx.label_else))
-            self.cuadruplos.append(Cuadruplo("label", None, None, ctx.label_end))
+            self.in_if_block = False
+
+            # Esta condición asegura que el bloque 'else' generará el salto adecuado y etiquetas
+            if self.has_else_block(ctx):
+                label_else, label_end = self.label_stack[-1]
+                self.cuadruplos.append(Cuadruplo("goto", None, None, label_end))
+                self.cuadruplos.append(Cuadruplo("label", None, None, label_else))
+
+        elif first_child == "else":
+            _, label_end = self.label_stack.pop()
+            self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
+            self.in_else_block = False
+            self.in_if_block = False
 
         elif first_child == "while":
             self.cuadruplos.append(Cuadruplo("goto", None, None, ctx.label_start))
