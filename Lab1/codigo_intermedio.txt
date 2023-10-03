@@ -6,7 +6,7 @@ if_false t1 None -> L1
 goto None None -> L2
 label None None -> L1
 label None None -> L2
-return var2 None -> None
+return "Este es un String, no un Int" None -> None
 end_method main - -> -
 end_class Main - -> -
 begin_class SecondClass - -> -

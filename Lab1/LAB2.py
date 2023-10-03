@@ -149,59 +149,90 @@ class IOWrapper:
 def execute_functions():
     global file_path
     input_stream = FileStream(file_path)
-    lexer = YAPLLexer(input_stream)
-    stream = CommonTokenStream(lexer)
 
     error_listener = CustomErrorListener()
+
+    lexer = CustomYAPLLexer(input_stream, error_listener)
+    stream = CommonTokenStream(lexer)
 
     parser = YAPLParser(stream)
     parser.removeErrorListeners()
     parser.addErrorListener(error_listener)
 
-    tree = parser.program()  # Esto creará un árbol incluso si hay errores sintácticos.
+    try:
+        tree = parser.program()  # Esto creará un árbol incluso si hay errores sintácticos.
 
-    # print(Trees.toStringTree(tree, None, parser))
+        # print(Trees.toStringTree(tree, None, parser))
 
-    plot_tree(parser, tree)
+        plot_tree(parser, tree)
 
-    # Camina por el árbol incluso si hay errores sintácticos
-    listener = MyYAPLListener()
-    walker = ParseTreeWalker()
-    walker.walk(listener, tree)
+        # Camina por el árbol incluso si hay errores sintácticos
+        listener = MyYAPLListener()
+        walker = ParseTreeWalker()
+        walker.walk(listener, tree)
 
-    # Ahora, al final, verifica e imprime todos los errores detectados
-    if (
-        parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0
-    ):  # Asumiendo que `semantic_errors` es una lista en tu listener
-        print("Se detectaron los siguientes errores:")
+        # Ahora, al final, verifica e imprime todos los errores detectados
+        if (
+            parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0
+        ):  # Asumiendo que `semantic_errors` es una lista en tu listener
+            print("Se detectaron los siguientes errores:")
 
-        for error in error_listener.error_messages:
-            print("Error Sintáctico: " + error)
+            for error in error_listener.error_messages:
+                print("Error Sintáctico: " + error)
 
-        for error in listener.semantic_errors:
-            print("Error Semántico: " + error)
+            for error in listener.semantic_errors:
+                print("Error Semántico: " + error)
 
-        print("Finalizando el programa.")
+            print("Finalizando el programa.")
 
-    # Usando el Generador
-    generador = GeneradorCodigoIntermedio()
-    walker.walk(
-        generador, tree
-    )  # Utilizamos el walker con el GeneradorCodigoIntermedio
-    codigo_intermedio = generador.get_codigo_intermedio()
+        # Usando el Generador
+        generador = GeneradorCodigoIntermedio()
+        walker.walk(
+            generador, tree
+        )  # Utilizamos el walker con el GeneradorCodigoIntermedio
+        codigo_intermedio = generador.get_codigo_intermedio()
 
-    # Guarda el código intermedio en un archivo
-    save_to_file(codigo_intermedio)
-
+        # Guarda el código intermedio en un archivo
+        save_to_file(codigo_intermedio)
+    except LexicalError as e:
+        #print(e)
+        print("Finalizando el programa debido a un error léxico.")
+        return  # Detiene la ejecución de la función
 
 # -------------------------------------Fin GUI------------------------------------
+class LexicalError(Exception):
+    pass
+#---------------------Analisis lexico--------------------------------------------
+class CustomYAPLLexer(YAPLLexer):
+    def __init__(self, input_stream, error_listener=None):
+        super().__init__(input_stream)
+        self._error_listener = error_listener
+
+    def recover(self, re):
+        position = self._tokenStartCharIndex
+        line = self._tokenStartLine
+        column = position - self._tokenStartColumn
+        offending_token = self._input.getText(self._tokenStartCharIndex, self._input.index)
+        msg = f"Token no reconocido: {offending_token}"
+        if self._error_listener:
+            self._error_listener.lexicalError(line, column, msg)
+        else:
+            print(f"Linea {line}:{column} {msg}")
+        super().recover(re)
+        raise LexicalError(f"Linea {line}:{column} {msg}")
+
+#---------------------Fin Analisis lexico--------------------------------------------
 
 # ----------------------Analisis sintanctico--------------------------------------
 # Mensajes de error personalizados
 class CustomErrorListener(ErrorListener):
     def __init__(self):
         super().__init__()
-        self.error_messages = set()  # Ahora es un conjunto para evitar duplicados
+        self.error_messages = set()
+
+    def lexicalError(self, line, column, msg):
+        error_msg = f"Linea {line}:{column} Error Lexico: {msg}"
+        self.error_messages.add(error_msg)
 
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
         # Asegúrate de que cada mensaje de error sea único
