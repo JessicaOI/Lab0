@@ -1,13 +1,13 @@
 begin_class Main - -> -
 = var1 None -> t1
 if_false t1 None -> L1
-= true branch None -> var2
+= "Hola" None -> var2
 goto None None -> L2
 label None None -> L1
-= false branch None -> var2
+= "False" None -> var2
 label None None -> L2
-= "true branch" None -> var2
-= "false branch" None -> var2
+= "Hola" None -> var2
+= "False" None -> var2
 return var2 None -> None
 end_method main - -> -
 end_class Main - -> -
@@ -19,6 +19,3 @@ if_false t2 None -> L4
 return var4 None -> None
 end_method secondMethod - -> -
 end_class SecondClass - -> -
-
-
-

@@ -1050,7 +1050,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
     def enterExpressionStatement(self, ctx: YAPLParser.ExpressionStatementContext):
         var_name = ctx.OBJECT_ID().getText()
-        value = ctx.expression().getText()
+        value = self.process_expression(ctx.expression())
         self.cuadruplos.append(Cuadruplo("=", value, None, var_name))
 
     def enterReturnStatement(self, ctx: YAPLParser.ReturnStatementContext):
@@ -1069,6 +1069,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
     def enterStatement(self, ctx: YAPLParser.StatementContext):
         first_child = ctx.getChild(0).getText()
+        print(first_child)
 
         if first_child == "if":
             temp = self.new_temp()
@@ -1077,22 +1078,29 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
             label_else = self.new_label()
             label_end = self.new_label()
-
-            # Si la condición es falsa, saltar al bloque else.
             self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_else))
 
-            # Procesa la rama 'then' y añade la asignación específica.
-            self.enterStatement(ctx.statement(0))
-            self.cuadruplos.append(Cuadruplo("=", "true branch", None, "var2"))
+            # Para el bloque THEN
+            then_statement = ctx.statement(0)
+            # Asumiendo que todas las declaraciones dentro del bloque THEN son del tipo ExpressionStatement
+            # Si esto no es cierto, necesitarás agregar lógica adicional para manejar otros tipos de declaraciones
+            for expression_statement in then_statement.getTypedRuleContexts(
+                YAPLParser.ExpressionStatementContext
+            ):
+                self.enterExpressionStatement(expression_statement)
 
-            # Si hay una rama 'else', generar el salto al final del bloque if-else y procesar la rama 'else'.
             if self.has_else_block(ctx):
                 self.cuadruplos.append(Cuadruplo("goto", None, None, label_end))
                 self.cuadruplos.append(Cuadruplo("label", None, None, label_else))
-                self.enterStatement(ctx.statement(1))
-                self.cuadruplos.append(Cuadruplo("=", "false branch", None, "var2"))
 
-            # Etiqueta para el final del bloque if-else.
+                # Para el bloque ELSE
+                else_statement = ctx.statement(1)
+                # Igual que antes, asumiendo que todas las declaraciones son del tipo ExpressionStatement
+                for expression_statement in else_statement.getTypedRuleContexts(
+                    YAPLParser.ExpressionStatementContext
+                ):
+                    self.enterExpressionStatement(expression_statement)
+
             self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
 
         # Pop the labels from the stack.
@@ -1109,29 +1117,14 @@ class GeneradorCodigoIntermedio(YAPLListener):
             ctx.label_start = label_start
             ctx.label_end = label_end
 
-    # def exitStatement(self, ctx: YAPLParser.StatementContext):
-    #     first_child = ctx.getChild(0).getText()
-
-    #     if first_child == "if":
-    #         label_else, label_end = self.label_stack.pop()
-
-    #         has_else = any(child.getText() == "else" for child in ctx.getChildren())
-
-    #         # If there is an 'else' statement, generate a jump to the end of the block.
-    #         if has_else:
-    #             self.cuadruplos.append(Cuadruplo("goto", None, None, label_end))
-
-    #         # Generate the label for the 'else' block.
-    #         self.cuadruplos.append(Cuadruplo("label", None, None, label_else))
-
-    #         # At the end of the 'if' block, generate the label for the end of the block.
-    #         self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
-
-    #     elif first_child == "while":
-    #         label_start = ctx.label_start
-    #         label_end = ctx.label_end
-    #         self.cuadruplos.append(Cuadruplo("goto", None, None, label_start))
-    #         self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
+    def handle_inner_statement(self, statement):
+        first_child_text = statement.getChild(0).getText()
+        if first_child_text == "if":
+            self.enterStatement(statement)
+        elif first_child_text == "while":
+            self.enterWhileStatement(statement)
+        elif statement.expression():
+            self.enterExpressionStatement(statement)
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
         if ctx.getChildCount() == 3 and ctx.expression(0) and ctx.expression(1):

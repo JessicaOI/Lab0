@@ -4,9 +4,9 @@ class Main {
     
     main(): String {
         if var1 then
-            var2 <- "true branch";
+            var2 <- "Hola";
         else
-            var2 <- "false branch";
+            var2 <- "False";
         fi;
         return var2;
     };
@@ -23,6 +23,8 @@ class SecondClass inherits Main{
         return var4;
     };
 };
+
+
 
 
 
