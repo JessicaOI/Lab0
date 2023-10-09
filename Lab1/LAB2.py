@@ -896,26 +896,21 @@ class MyYAPLListener(YAPLListener):
         id_semantic_type = symbol.semantic_type
 
         expr_semantic_type = self.get_expression_type(expression)
+        print(f"Expresión: {expression.getText()}, Tipo Detectado: {expr_semantic_type}")
 
         # Verificar la compatibilidad de tipos
         if id_semantic_type != expr_semantic_type:
-            if not self.symbol_table.is_subtype(expr_semantic_type, id_semantic_type):
+            # Caso especial para permitir el casteo implícito de Bool a Int
+            if id_semantic_type == "Int" and expr_semantic_type == "Bool":
+                pass
+            # Caso especial para permitir el casteo implícito de Int a Bool
+            elif id_semantic_type == "Bool" and expr_semantic_type == "Int":
+                pass
+            elif not self.symbol_table.is_subtype(expr_semantic_type, id_semantic_type):
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: El tipo de la expresión no coincide con el tipo declarado para {object_id}."
                 )
 
-        # Verificar la compatibilidad de tipos
-        if id_semantic_type != expr_semantic_type:
-            # Añadir el caso especial para permitir el casteo implícito de Bool a Int
-            if id_semantic_type == "Int" and expr_semantic_type == "Bool":
-                # Aquí podrías hacer la conversión implícita, si es necesario
-                pass
-            # Añadir el caso especial para permitir el casteo implícito de Int a Bool
-            elif id_semantic_type == "Bool" and expr_semantic_type == "Int":
-                # Aquí podrías hacer la conversión implícita, si es necesario
-                pass
-
-        # Aquí también puedes hacer verificaciones adicionales relacionadas con la compatibilidad de tipos entre el identificador y la expresión.
 
     # Método auxiliar para obtener el tipo semántico de una expresión (esto es solo un ejemplo simplificado)
     def get_expression_type(self, expr_ctx):
@@ -927,7 +922,21 @@ class MyYAPLListener(YAPLListener):
         elif expr_ctx.STRING():
             return "String"
         elif expr_ctx.TRUE() or expr_ctx.FALSE():
-            return "Bool"
+            return "Bool"        
+        
+        # Manejo de operaciones aritméticas binarias
+        elif expr_ctx.getChildCount() == 3:
+            # Es una operación binaria (podría ser +, -, *, /, etc.)
+            left_type = self.get_expression_type(expr_ctx.getChild(0))
+            right_type = self.get_expression_type(expr_ctx.getChild(2))
+            
+            # Si ambos lados de la operación son del tipo Int, entonces el resultado es Int
+            if left_type == "Int" and right_type == "Int":
+                return "Int"
+
+        # Añadir lógica para otros tipos de expresiones si es necesario.
+        # Por ejemplo, si tienes otros tipos de datos o más operaciones complejas.
+        
         else:
             # ... otros casos
             return "Unknown"
@@ -1154,6 +1163,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
         if ctx.getChildCount() == 3 and ctx.expression(0) and ctx.expression(1):
+            print(f"Operación: {ctx.getChild(1).getText()}, Izquierdo: {ctx.getChild(0).getText()}, Derecho: {ctx.getChild(2).getText()}")
             left_expr = ctx.expression(0).getText()
             right_expr = ctx.expression(1).getText()
             operator = ctx.getChild(1).getText()
