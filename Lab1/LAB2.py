@@ -155,6 +155,17 @@ def execute_functions():
     lexer = CustomYAPLLexer(input_stream, error_listener)
     stream = CommonTokenStream(lexer)
 
+    # Obtener errores léxicos
+    tokens = lexer.getAllTokens()  # Esto procesará todos los tokens y llenará error_listener con errores léxicos
+
+    if len(error_listener.error_messages) > 0:
+        print("Se detectaron los siguientes errores léxicos:")
+        for error in error_listener.error_messages:
+            print(error)
+        print("Finalizando el programa debido a errores léxicos.")
+        return
+
+    # Procesar análisis sintáctico y semántico
     parser = YAPLParser(stream)
     parser.removeErrorListeners()
     parser.addErrorListener(error_listener)
@@ -172,9 +183,7 @@ def execute_functions():
         walker.walk(listener, tree)
 
         # Ahora, al final, verifica e imprime todos los errores detectados
-        if (
-            parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0
-        ):  # Asumiendo que `semantic_errors` es una lista en tu listener
+        if parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0:
             print("Se detectaron los siguientes errores:")
 
             for error in error_listener.error_messages:
@@ -187,17 +196,16 @@ def execute_functions():
 
         # Usando el Generador
         generador = GeneradorCodigoIntermedio()
-        walker.walk(
-            generador, tree
-        )  # Utilizamos el walker con el GeneradorCodigoIntermedio
+        walker.walk(generador, tree)  # Utilizamos el walker con el GeneradorCodigoIntermedio
         codigo_intermedio = generador.get_codigo_intermedio()
 
         # Guarda el código intermedio en un archivo
         save_to_file(codigo_intermedio)
-    except LexicalError as e:
-        #print(e)
-        print("Finalizando el programa debido a un error léxico.")
-        return  # Detiene la ejecución de la función
+        
+    except Exception as e:  # Captura otras excepciones para asegurar una salida limpia
+        #print(f"Error: {e}")
+        print("Finalizando el programa debido a un error inesperado.")
+
 
 # -------------------------------------Fin GUI------------------------------------
 class LexicalError(Exception):
@@ -219,7 +227,6 @@ class CustomYAPLLexer(YAPLLexer):
         else:
             print(f"Linea {line}:{column} {msg}")
         super().recover(re)
-        raise LexicalError(f"Linea {line}:{column} {msg}")
 
 #---------------------Fin Analisis lexico--------------------------------------------
 
