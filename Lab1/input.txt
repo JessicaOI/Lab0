@@ -23,3 +23,6 @@ class SecondClass inherits Main{
         return var4;
     };
 };
+
+
+

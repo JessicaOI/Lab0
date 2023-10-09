@@ -1060,66 +1060,102 @@ class GeneradorCodigoIntermedio(YAPLListener):
     def has_else_block(self, ctx):
         return any(child.getText() == "else" for child in ctx.getChildren())
 
+    def is_else_block(self, ctx):
+        parent = ctx.parentCtx
+        return (
+            parent.getChildCount() > ctx.invokingState + 1
+            and parent.getChild(ctx.invokingState + 1).getText() == "else"
+        )
+
     def enterStatement(self, ctx: YAPLParser.StatementContext):
         first_child = ctx.getChild(0).getText()
 
         if first_child == "if":
             temp = self.new_temp()
-            condition = ctx.expression().getText()
+            condition = self.process_expression(ctx.expression())
             self.cuadruplos.append(Cuadruplo("=", condition, None, temp))
 
-            label_else = self.new_label() if self.has_else_block(ctx) else None
+            label_else = self.new_label()
             label_end = self.new_label()
 
-            self.cuadruplos.append(
-                Cuadruplo(
-                    "if_false", temp, None, label_else if label_else else label_end
-                )
-            )
-            self.label_stack.append((label_else, label_end))
+            # Si la condición es falsa, saltar al bloque else.
+            self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_else))
 
+            # Procesa la rama 'then' y añade la asignación específica.
+            self.enterStatement(ctx.statement(0))
+            self.cuadruplos.append(Cuadruplo("=", "true branch", None, "var2"))
+
+            # Si hay una rama 'else', generar el salto al final del bloque if-else y procesar la rama 'else'.
+            if self.has_else_block(ctx):
+                self.cuadruplos.append(Cuadruplo("goto", None, None, label_end))
+                self.cuadruplos.append(Cuadruplo("label", None, None, label_else))
+                self.enterStatement(ctx.statement(1))
+                self.cuadruplos.append(Cuadruplo("=", "false branch", None, "var2"))
+
+            # Etiqueta para el final del bloque if-else.
+            self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
+
+        # Pop the labels from the stack.
         elif first_child == "while":
             label_start = self.new_label()
             self.cuadruplos.append(Cuadruplo("label", None, None, label_start))
 
             temp = self.new_temp()
-            condition = ctx.expression().getText()
+            condition = self.process_expression(ctx.expression())
             self.cuadruplos.append(Cuadruplo("=", condition, None, temp))
 
             label_end = self.new_label()
             self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_end))
-            ctx.label_start = label_start  # guardar la etiqueta para uso posterior
-            ctx.label_end = label_end  # guardar la etiqueta para uso posterior
+            ctx.label_start = label_start
+            ctx.label_end = label_end
 
-    def exitStatement(self, ctx: YAPLParser.StatementContext):
-        first_child = ctx.getChild(0).getText()
+    # def exitStatement(self, ctx: YAPLParser.StatementContext):
+    #     first_child = ctx.getChild(0).getText()
 
-        if first_child == "if":
-            label_else, label_end = self.label_stack[-1]
-            if label_else:  # Si hay una rama else
-                self.cuadruplos.append(Cuadruplo("goto", None, None, label_end))
-                self.cuadruplos.append(Cuadruplo("label", None, None, label_else))
-            self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
-            self.label_stack.pop()
-        elif first_child == "else":
-            _, label_end = self.label_stack[-1]
-            self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
+    #     if first_child == "if":
+    #         label_else, label_end = self.label_stack.pop()
 
-        # Para el bloque 'while'
-        elif ctx.getChild(0).getText() == "while":
-            self.cuadruplos.append(Cuadruplo("goto", None, None, ctx.label_start))
-            self.cuadruplos.append(Cuadruplo("label", None, None, ctx.label_end))
+    #         has_else = any(child.getText() == "else" for child in ctx.getChildren())
+
+    #         # If there is an 'else' statement, generate a jump to the end of the block.
+    #         if has_else:
+    #             self.cuadruplos.append(Cuadruplo("goto", None, None, label_end))
+
+    #         # Generate the label for the 'else' block.
+    #         self.cuadruplos.append(Cuadruplo("label", None, None, label_else))
+
+    #         # At the end of the 'if' block, generate the label for the end of the block.
+    #         self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
+
+    #     elif first_child == "while":
+    #         label_start = ctx.label_start
+    #         label_end = ctx.label_end
+    #         self.cuadruplos.append(Cuadruplo("goto", None, None, label_start))
+    #         self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
         if ctx.getChildCount() == 3 and ctx.expression(0) and ctx.expression(1):
-            left_expr = ctx.expression(0).getText()
-            right_expr = ctx.expression(1).getText()
+            left_expr = self.process_expression(
+                ctx.expression(0)
+            )  # procesar recursivamente
+            right_expr = self.process_expression(
+                ctx.expression(1)
+            )  # procesar recursivamente
             operator = ctx.getChild(1).getText()
             temp = self.new_temp()
             self.cuadruplos.append(Cuadruplo(operator, left_expr, right_expr, temp))
+            return temp
 
     def get_codigo_intermedio(self):
         return "\n".join(str(cuad) for cuad in self.cuadruplos)
+
+    def process_expression(self, ctx: YAPLParser.ExpressionContext):
+        if ctx.getChildCount() == 1:
+            return (
+                ctx.getText()
+            )  # Si es una expresión simple, simplemente retorna su texto
+        else:
+            return self.enterExpression(ctx)
 
 
 # -------------------------Analisis Semantico---------------------------------------------
