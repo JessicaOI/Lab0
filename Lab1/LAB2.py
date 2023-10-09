@@ -153,22 +153,25 @@ def execute_functions():
     error_listener = CustomErrorListener()
 
     lexer = CustomYAPLLexer(input_stream, error_listener)
-    stream = CommonTokenStream(lexer)
-
-    # Obtener errores léxicos
-    tokens = lexer.getAllTokens()  # Esto procesará todos los tokens y llenará error_listener con errores léxicos
+    
+    # Creamos un stream para análisis léxico
+    lex_stream = CommonTokenStream(lexer)
+    lex_stream.fill()  # Esto llenará el stream y recolectará los tokens y posibles errores léxicos
 
     if len(error_listener.error_messages) > 0:
-        print("Se detectaron los siguientes errores léxicos:")
+        print("\nSe detectaron los siguientes errores léxicos:")
         for error in error_listener.error_messages:
             print(error)
         print("Finalizando el programa debido a errores léxicos.")
         return
 
-    # Procesar análisis sintáctico y semántico
-    parser = YAPLParser(stream)
+    # Restablecemos el lexer y creamos un nuevo stream para análisis sintáctico
+    lexer.reset()
+    syn_stream = CommonTokenStream(lexer)
+    parser = YAPLParser(syn_stream)
     parser.removeErrorListeners()
     parser.addErrorListener(error_listener)
+
 
     try:
         tree = parser.program()  # Esto creará un árbol incluso si hay errores sintácticos.
@@ -203,7 +206,7 @@ def execute_functions():
         save_to_file(codigo_intermedio)
         
     except Exception as e:  # Captura otras excepciones para asegurar una salida limpia
-        #print(f"Error: {e}")
+        print(f"Error: {e}")
         print("Finalizando el programa debido a un error inesperado.")
 
 
@@ -227,6 +230,7 @@ class CustomYAPLLexer(YAPLLexer):
         else:
             print(f"Linea {line}:{column} {msg}")
         super().recover(re)
+
 
 #---------------------Fin Analisis lexico--------------------------------------------
 

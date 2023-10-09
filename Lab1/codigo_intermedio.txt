@@ -1,0 +1,21 @@
+begin_class Main - -> -
+= var1 None -> t1
+if_false t1 None -> L1
+= "true branch" None -> var2
+= "false branch" None -> var2
+goto None None -> L2
+label None None -> L1
+label None None -> L2
+return "Este es un String, no un Int" None -> None
+end_method main - -> -
+end_class Main - -> -
+begin_class SecondClass - -> -
+label None None -> L3
+= var3 None -> t2
+if_false t2 None -> L4
+= 1 None -> var4
+goto None None -> L3
+label None None -> L4
+return var4 None -> None
+end_method secondMethod - -> -
+end_class SecondClass - -> -
