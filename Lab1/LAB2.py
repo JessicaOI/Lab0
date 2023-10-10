@@ -370,6 +370,7 @@ class Symbol:
         parent_class=None,
         default_value=None,
         byte_size=None,
+        value=None
     ):
         self.name = name
         self.type = type
@@ -386,6 +387,7 @@ class Symbol:
         self.parent_class = parent_class
         self.default_value = default_value
         self.byte_size = byte_size
+        self.value = value
 
 
 class SymbolTable:
@@ -419,6 +421,7 @@ class SymbolTable:
             "Parent Class",
             "Default Value",
             "Byte Size",
+            "Value"
         ]
         table_data = []
         for symbol in self.symbols:
@@ -597,6 +600,7 @@ class MyYAPLListener(YAPLListener):
             "String": 256,  # Suponiendo que un carácter en una cadena ocupa 1 byte
             "Bool": 1,  # Suponiendo que un booleano ocupa 1 byte
         }
+        self.variable_values = {} # Para inicializar variable_values
 
     def enterClassDef(self, ctx):
         self.has_class = True
@@ -810,6 +814,10 @@ class MyYAPLListener(YAPLListener):
 
         # Comprueba operaciones binarias, que tendrían tres hijos (e.g., expression '+' expression)
         if ctx.getChildCount() == 3:
+            line = ctx.start.line
+            column = ctx.start.column
+            #aqui ayudo a debuguear si estaba tomando bien los valores para hacerle las operaciones aritmeticas
+            #print(f"[Línea {line}, Columna {column}] Operación: {ctx.getChild(1).getText()}, Izquierdo: {ctx.getChild(0).getText()}, Derecho: {ctx.getChild(2).getText()}")
             left_operand = ctx.getChild(0)
             operator = ctx.getChild(1).getText()
             right_operand = ctx.getChild(2)
@@ -896,7 +904,46 @@ class MyYAPLListener(YAPLListener):
         id_semantic_type = symbol.semantic_type
 
         expr_semantic_type = self.get_expression_type(expression)
-        print(f"Expresión: {expression.getText()}, Tipo Detectado: {expr_semantic_type}")
+        #print(f"Expresión: {expression.getText()}, Tipo Detectado: {expr_semantic_type}")
+
+        # Si la expresión es una simple asignación (ejemplo: var4 = 1)
+        if expression.getChildCount() == 1:
+            single_operand = expression.getChild(0).getText()
+            
+            # Si el operando es un número
+            if single_operand.isdigit():
+                #symbol.value = int(single_operand)
+                symbol.value = int(single_operand)
+                #print(f"Valor de {object_id}: {symbol.value}")
+            # Aquí también puedes agregar lógica para otros tipos de operandos si es necesario.
+
+        # Evaluamos y almacenamos el valor si es una operación aritmética simple.
+
+        # Evaluamos y almacenamos el valor si es una operación aritmética simple.
+        elif expression.getChildCount() == 3:
+            left_operand = expression.getChild(0).getText()
+            operator = expression.getChild(1).getText()
+            right_operand = expression.getChild(2).getText()
+
+            # Si ambos operandos son números, los evaluamos.
+            if left_operand.isdigit() and right_operand.isdigit():
+                left_value = int(left_operand)
+                right_value = int(right_operand)
+
+                if operator == '+':
+                    result = left_value + right_value
+                elif operator == '-':
+                    result = left_value - right_value
+                elif operator == '*':
+                    result = left_value * right_value
+                elif operator == '/':
+                    result = left_value / right_value
+                # Puedes añadir otros operadores si es necesario
+
+                # Almacenamos el valor resultante para la variable.
+                symbol.value = result  # Esta es la línea clave. Estamos asignando el valor calculado al símbolo en la tabla de símbolos.
+                #print(f"Valor de {object_id}: {symbol.value}")  # Imprimimos el valor para verificación.
+                #print(f"Evaluación: {left_value} {operator} {right_value} = {result}")
 
         # Verificar la compatibilidad de tipos
         if id_semantic_type != expr_semantic_type:
@@ -910,6 +957,7 @@ class MyYAPLListener(YAPLListener):
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: El tipo de la expresión no coincide con el tipo declarado para {object_id}."
                 )
+
 
 
     # Método auxiliar para obtener el tipo semántico de una expresión (esto es solo un ejemplo simplificado)
