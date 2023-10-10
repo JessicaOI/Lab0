@@ -1120,6 +1120,8 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.contained_statements = {}
         self.visited_nodes = set()
         self.available_temporaries = []
+        self.processed_temporaries = set()
+        self.processed_operations = set()
 
     def new_temp(self):
         if self.available_temporaries:
@@ -1319,17 +1321,24 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 ):
                     self.processed_statements.add(expression_statement)
 
-    def enterExpression(self, ctx: YAPLParser.ExpressionContext):
+    def process_expression(self, ctx: YAPLParser.ExpressionContext):
+        # Verificar si la operación ya ha sido procesada
+        operation = ctx.getText()
+        if operation in self.processed_operations:
+            return operation
+
+        # Si la operación no se ha procesado aún, continuar con el procesamiento
         if ctx.getChildCount() == 1:
-            return (
-                ctx.getText()
-            )  # Si es una expresión simple, simplemente retorna su texto
+            return ctx.getText()
         elif ctx.getChildCount() == 2:
             operator = ctx.getChild(0).getText()
             operand = self.process_expression(ctx.expression(0))
             temp = self.new_temp()
             if operator == "-":
                 self.add_cuadruplo(Cuadruplo("negate", operand, None, temp))
+            self.processed_operations.add(
+                operation
+            )  # Marcar la operación como procesada
             return temp
         else:
             left_expr = self.process_expression(ctx.expression(0))
@@ -1337,6 +1346,9 @@ class GeneradorCodigoIntermedio(YAPLListener):
             operator = ctx.getChild(1).getText()
             temp = self.new_temp()
             self.add_cuadruplo(Cuadruplo(operator, left_expr, right_expr, temp))
+            self.processed_operations.add(
+                operation
+            )  # Marcar la operación como procesada
             return temp
 
     def get_codigo_intermedio(self):

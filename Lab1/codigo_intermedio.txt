@@ -7,14 +7,13 @@ label None None -> L1
 + 8 9 -> t2
 = t2 None -> var2
 label None None -> L2
-+ 8 9 -> t3
 return "Este es un String, no un Int" None -> None
 end_method main - -> -
 end_class Main - -> -
 begin_class SecondClass - -> -
 label None None -> L3
-= var3 None -> t4
-if_false t4 None -> L4
+= var3 None -> t3
+if_false t3 None -> L4
 = 1 None -> var4
 goto None None -> L3
 label None None -> L4
