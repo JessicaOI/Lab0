@@ -1,2 +1,11 @@
-var x = 5;
+class Main {
+    var1: Int;
+    var2: Int;
+    
+    main(): Int {
+        var1 <- 5;
+        var2 <- var1 * -3 + var1 * -3;
+        return var2;
+    };
+};
 

@@ -4,9 +4,9 @@ class Main {
     
     main(): String {
         if var1 then
-            var2 <- "Hola";
+            var2 <- "Hola Hola";
         else
-            var2 <- "False";
+            var2 <- "intento";
         fi;
         return var2;
     };
@@ -18,11 +18,13 @@ class SecondClass inherits Main{
     
     secondMethod(): Int {
         while var3 loop
-            var4 <- 1;
+            var4 <- 9;
         pool;
         return var4;
     };
 };
+
+
 
 
 

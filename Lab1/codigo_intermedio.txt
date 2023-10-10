@@ -1,13 +1,11 @@
 begin_class Main - -> -
 = var1 None -> t1
 if_false t1 None -> L1
-= "Hola" None -> var2
+= "Hola Hola" None -> var2
 goto None None -> L2
 label None None -> L1
-= "False" None -> var2
+= "intento" None -> var2
 label None None -> L2
-= "Hola" None -> var2
-= "False" None -> var2
 return var2 None -> None
 end_method main - -> -
 end_class Main - -> -
@@ -15,7 +13,9 @@ begin_class SecondClass - -> -
 label None None -> L3
 = var3 None -> t2
 if_false t2 None -> L4
-= 1 None -> var4
+= 9 None -> var4
+goto None None -> L3
+label None None -> L4
 return var4 None -> None
 end_method secondMethod - -> -
 end_class SecondClass - -> -

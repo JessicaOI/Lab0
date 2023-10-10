@@ -13,6 +13,7 @@ from tabulate import tabulate
 from copy import deepcopy
 import tkinter as tk
 from tkinter import filedialog, messagebox, Text, simpledialog
+import inspect
 
 # ---------------------GUI------------------------------------------------------------
 text_editor = None
@@ -731,7 +732,11 @@ class MyYAPLListener(YAPLListener):
         if ctx.getChildCount() == 2:
             operand = ctx.getChild(1)
             operator = ctx.getChild(0).getText()
-            object_id = operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
+            object_id = (
+                operand.getText()
+                if isinstance(operand, antlr4.tree.TerminalNode)
+                else None
+            )
 
             if operator == "~":
                 # Código existente para el operador ~
@@ -1005,7 +1010,11 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.in_if_block = False
         self.in_else_block = False
         self.label_stack = []
+        self.inside_block = False
         self.jump_stack = []
+        self.processed_statements = set()
+        self.contained_statements = {}
+        self.visited_nodes = set()
 
     def new_temp(self):
         self.temp_counter += 1
@@ -1025,11 +1034,11 @@ class GeneradorCodigoIntermedio(YAPLListener):
     def enterClassDef(self, ctx: YAPLParser.ClassDefContext):
         class_name = ctx.TYPE_ID()[0].getText()
         self.enter_scope(class_name)
-        self.cuadruplos.append(Cuadruplo("begin_class", class_name, "-", "-"))
+        self.add_cuadruplo(Cuadruplo("begin_class", class_name, "-", "-"))
 
     def exitClassDef(self, ctx: YAPLParser.ClassDefContext):
         class_name = ctx.TYPE_ID()[0].getText()
-        self.cuadruplos.append(Cuadruplo("end_class", class_name, "-", "-"))
+        self.add_cuadruplo(Cuadruplo("end_class", class_name, "-", "-"))
         self.exit_scope()
 
     def enterFeature(self, ctx: YAPLParser.FeatureContext):
@@ -1040,22 +1049,26 @@ class GeneradorCodigoIntermedio(YAPLListener):
         elif ctx.OBJECT_ID() and ctx.LPAREN() and not ctx.RPAREN():
             func_name = ctx.OBJECT_ID().getText()
             self.enter_scope(func_name)
-            self.cuadruplos.append(Cuadruplo("begin_method", func_name, "-", "-"))
+            self.add_cuadruplo(Cuadruplo("begin_method", func_name, "-", "-"))
 
     def exitFeature(self, ctx: YAPLParser.FeatureContext):
         if ctx.OBJECT_ID() and ctx.LPAREN():
             func_name = ctx.OBJECT_ID().getText()
-            self.cuadruplos.append(Cuadruplo("end_method", func_name, "-", "-"))
+            self.add_cuadruplo(Cuadruplo("end_method", func_name, "-", "-"))
             self.exit_scope()
 
     def enterExpressionStatement(self, ctx: YAPLParser.ExpressionStatementContext):
-        var_name = ctx.OBJECT_ID().getText()
-        value = self.process_expression(ctx.expression())
-        self.cuadruplos.append(Cuadruplo("=", value, None, var_name))
+        statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
+
+        if statement_key not in self.processed_statements:
+            var_name = ctx.OBJECT_ID().getText()
+            value = self.process_expression(ctx.expression())
+            self.add_cuadruplo(Cuadruplo("=", value, None, var_name))
+            self.processed_statements.add(statement_key)
 
     def enterReturnStatement(self, ctx: YAPLParser.ReturnStatementContext):
         value = ctx.expression().getText()
-        self.cuadruplos.append(Cuadruplo("return", value, None, None))
+        self.add_cuadruplo(Cuadruplo("return", value, None, None))
 
     def has_else_block(self, ctx):
         return any(child.getText() == "else" for child in ctx.getChildren())
@@ -1067,55 +1080,125 @@ class GeneradorCodigoIntermedio(YAPLListener):
             and parent.getChild(ctx.invokingState + 1).getText() == "else"
         )
 
-    def enterStatement(self, ctx: YAPLParser.StatementContext):
-        first_child = ctx.getChild(0).getText()
-        print(first_child)
+    def add_cuadruplo(self, cuadruplo: Cuadruplo):
+        calling_function_name = inspect.stack()[1].function
+        print(f"In {calling_function_name}: Adding quadruple -> {cuadruplo}")
 
-        if first_child == "if":
-            temp = self.new_temp()
-            condition = self.process_expression(ctx.expression())
-            self.cuadruplos.append(Cuadruplo("=", condition, None, temp))
+        # Si los cuádruplos están vacíos, simplemente añade el cuadruplo.
+        if not self.cuadruplos:
+            self.cuadruplos.append(cuadruplo)
+            return
 
-            label_else = self.new_label()
-            label_end = self.new_label()
-            self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_else))
+        # Verifica si el cuadruplo actual y el último añadido son asignaciones a la misma variable.
+        last_cuadruplo = self.cuadruplos[-1]
+        if (
+            cuadruplo.operador == "="
+            and last_cuadruplo.operador == "="
+            and cuadruplo.destino == last_cuadruplo.destino
+        ):
+            # Si es así, reemplace el último cuadruplo con el nuevo.
+            self.cuadruplos[-1] = cuadruplo
+            print(f"Replacing cuadruplo: {last_cuadruplo} -> {cuadruplo}")
+        elif all(c != cuadruplo for c in self.cuadruplos):
+            # Si el cuadruplo no está en la lista en absoluto, añádelo.
+            self.cuadruplos.append(cuadruplo)
+        else:
+            print(f"Skipping cuadruplo: {cuadruplo} - already exists.")
 
-            # Para el bloque THEN
-            then_statement = ctx.statement(0)
-            # Asumiendo que todas las declaraciones dentro del bloque THEN son del tipo ExpressionStatement
-            # Si esto no es cierto, necesitarás agregar lógica adicional para manejar otros tipos de declaraciones
-            for expression_statement in then_statement.getTypedRuleContexts(
-                YAPLParser.ExpressionStatementContext
-            ):
+    def process_statement_block(self, block_statement):
+        for expression_statement in block_statement.getTypedRuleContexts(
+            YAPLParser.ExpressionStatementContext
+        ):
+            # Verificar si el statement ya ha sido procesado
+            if expression_statement not in self.processed_statements:
+                # Si no ha sido procesado, añadirlo al conjunto de statements procesados
+                self.processed_statements.add(expression_statement)
+                # Luego procesarlo
                 self.enterExpressionStatement(expression_statement)
+            else:
+                # Si ya ha sido procesado, imprimir un mensaje de debug y omitir el procesamiento
+                print(
+                    f"Skipping processed block statement: {expression_statement.getText()}"
+                )
 
-            if self.has_else_block(ctx):
-                self.cuadruplos.append(Cuadruplo("goto", None, None, label_end))
-                self.cuadruplos.append(Cuadruplo("label", None, None, label_else))
+    def enterStatement(self, ctx: YAPLParser.StatementContext):
 
-                # Para el bloque ELSE
-                else_statement = ctx.statement(1)
-                # Igual que antes, asumiendo que todas las declaraciones son del tipo ExpressionStatement
-                for expression_statement in else_statement.getTypedRuleContexts(
+        print(f"Attempting to enter statement: {ctx.getText()}")
+
+        # Si el statement ya fue procesado, lo omitimos
+        if ctx in self.processed_statements:
+            print(f"Skipping processed statement: {ctx.getText()}")
+            # Marcar el statement como procesado
+            self.processed_statements.add(ctx)
+            return
+
+        else:
+            # Marcar el statement como procesado
+            self.processed_statements.add(ctx)
+
+            first_child = ctx.getChild(0).getText()
+
+            if first_child == "if":
+                self.inside_block = True
+                temp = self.new_temp()
+                condition = self.process_expression(ctx.expression())
+                self.add_cuadruplo(Cuadruplo("=", condition, None, temp))
+
+                label_else = self.new_label()
+                label_end = self.new_label()
+                self.add_cuadruplo(Cuadruplo("if_false", temp, None, label_else))
+
+                self.process_statement_block(ctx.statement(0))
+
+                if self.has_else_block(ctx):
+                    self.add_cuadruplo(Cuadruplo("goto", None, None, label_end))
+                    self.add_cuadruplo(Cuadruplo("label", None, None, label_else))
+                    self.process_statement_block(ctx.statement(1))
+                    self.add_cuadruplo(Cuadruplo("label", None, None, label_end))
+
+                self.inside_block = False
+
+            elif first_child == "while":
+                self.inside_block = True
+                label_start = self.new_label()
+                self.add_cuadruplo(Cuadruplo("label", None, None, label_start))
+
+                temp = self.new_temp()
+                condition = self.process_expression(ctx.expression())
+                self.add_cuadruplo(Cuadruplo("=", condition, None, temp))
+
+                label_end = self.new_label()
+                self.add_cuadruplo(Cuadruplo("if_false", temp, None, label_end))
+
+                while_statement = ctx.statement(0)
+                for expression_statement in while_statement.getTypedRuleContexts(
                     YAPLParser.ExpressionStatementContext
                 ):
+                    self.processed_statements.add(expression_statement)
                     self.enterExpressionStatement(expression_statement)
 
-            self.cuadruplos.append(Cuadruplo("label", None, None, label_end))
+                self.add_cuadruplo(Cuadruplo("goto", None, None, label_start))
+                self.add_cuadruplo(Cuadruplo("label", None, None, label_end))
 
-        # Pop the labels from the stack.
-        elif first_child == "while":
-            label_start = self.new_label()
-            self.cuadruplos.append(Cuadruplo("label", None, None, label_start))
+                ctx.label_start = label_start
+                ctx.label_end = label_end
 
-            temp = self.new_temp()
-            condition = self.process_expression(ctx.expression())
-            self.cuadruplos.append(Cuadruplo("=", condition, None, temp))
+                self.inside_block = False
+            else:
+                if not self.inside_block:
+                    if ctx in self.processed_statements:
+                        return
+                    for expression_statement in ctx.getTypedRuleContexts(
+                        YAPLParser.ExpressionStatementContext
+                    ):
+                        self.enterExpressionStatement(expression_statement)
 
-            label_end = self.new_label()
-            self.cuadruplos.append(Cuadruplo("if_false", temp, None, label_end))
-            ctx.label_start = label_start
-            ctx.label_end = label_end
+            for statement in ctx.statement():
+                self.processed_statements.add(statement)
+                for expression_statement in statement.getTypedRuleContexts(
+                    YAPLParser.ExpressionStatementContext
+                ):
+                    self.processed_statements.add(expression_statement)
 
     def handle_inner_statement(self, statement):
         first_child_text = statement.getChild(0).getText()
@@ -1127,16 +1210,23 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.enterExpressionStatement(statement)
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
-        if ctx.getChildCount() == 3 and ctx.expression(0) and ctx.expression(1):
-            left_expr = self.process_expression(
-                ctx.expression(0)
-            )  # procesar recursivamente
-            right_expr = self.process_expression(
-                ctx.expression(1)
-            )  # procesar recursivamente
+        if ctx.getChildCount() == 1:
+            return (
+                ctx.getText()
+            )  # Si es una expresión simple, simplemente retorna su texto
+        elif ctx.getChildCount() == 2:
+            operator = ctx.getChild(0).getText()
+            operand = self.process_expression(ctx.expression(0))
+            temp = self.new_temp()
+            if operator == "-":
+                self.add_cuadruplo(Cuadruplo("negate", operand, None, temp))
+            return temp
+        else:
+            left_expr = self.process_expression(ctx.expression(0))
+            right_expr = self.process_expression(ctx.expression(1))
             operator = ctx.getChild(1).getText()
             temp = self.new_temp()
-            self.cuadruplos.append(Cuadruplo(operator, left_expr, right_expr, temp))
+            self.add_cuadruplo(Cuadruplo(operator, left_expr, right_expr, temp))
             return temp
 
     def get_codigo_intermedio(self):
