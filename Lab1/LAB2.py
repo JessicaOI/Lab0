@@ -150,59 +150,108 @@ class IOWrapper:
 def execute_functions():
     global file_path
     input_stream = FileStream(file_path)
-    lexer = YAPLLexer(input_stream)
-    stream = CommonTokenStream(lexer)
 
     error_listener = CustomErrorListener()
 
-    parser = YAPLParser(stream)
+    lexer = CustomYAPLLexer(input_stream, error_listener)
+
+    # Creamos un stream para análisis léxico
+    lex_stream = CommonTokenStream(lexer)
+    lex_stream.fill()  # Esto llenará el stream y recolectará los tokens y posibles errores léxicos
+
+    if len(error_listener.error_messages) > 0:
+        print("\nSe detectaron los siguientes errores léxicos:")
+        for error in error_listener.error_messages:
+            print(error)
+        print("Finalizando el programa debido a errores léxicos.")
+        return
+
+    # Restablecemos el lexer y creamos un nuevo stream para análisis sintáctico
+    lexer.reset()
+    syn_stream = CommonTokenStream(lexer)
+    parser = YAPLParser(syn_stream)
     parser.removeErrorListeners()
     parser.addErrorListener(error_listener)
 
-    tree = parser.program()  # Esto creará un árbol incluso si hay errores sintácticos.
+    try:
+        tree = (
+            parser.program()
+        )  # Esto creará un árbol incluso si hay errores sintácticos.
 
-    # print(Trees.toStringTree(tree, None, parser))
+        # print(Trees.toStringTree(tree, None, parser))
 
-    plot_tree(parser, tree)
+        plot_tree(parser, tree)
 
-    # Camina por el árbol incluso si hay errores sintácticos
-    listener = MyYAPLListener()
-    walker = ParseTreeWalker()
-    walker.walk(listener, tree)
+        # Camina por el árbol incluso si hay errores sintácticos
+        listener = MyYAPLListener()
+        walker = ParseTreeWalker()
+        walker.walk(listener, tree)
 
-    # Ahora, al final, verifica e imprime todos los errores detectados
-    if (
-        parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0
-    ):  # Asumiendo que `semantic_errors` es una lista en tu listener
-        print("Se detectaron los siguientes errores:")
+        # Ahora, al final, verifica e imprime todos los errores detectados
+        if parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0:
+            print("Se detectaron los siguientes errores:")
 
-        for error in error_listener.error_messages:
-            print("Error Sintáctico: " + error)
+            for error in error_listener.error_messages:
+                print("Error Sintáctico: " + error)
 
-        for error in listener.semantic_errors:
-            print("Error Semántico: " + error)
+            for error in listener.semantic_errors:
+                print("Error Semántico: " + error)
 
-        print("Finalizando el programa.")
+            print("Finalizando el programa.")
 
-    # Usando el Generador
-    generador = GeneradorCodigoIntermedio()
-    walker.walk(
-        generador, tree
-    )  # Utilizamos el walker con el GeneradorCodigoIntermedio
-    codigo_intermedio = generador.get_codigo_intermedio()
+        # Usando el Generador
+        generador = GeneradorCodigoIntermedio()
+        walker.walk(
+            generador, tree
+        )  # Utilizamos el walker con el GeneradorCodigoIntermedio
+        codigo_intermedio = generador.get_codigo_intermedio()
 
-    # Guarda el código intermedio en un archivo
-    save_to_file(codigo_intermedio)
+        # Guarda el código intermedio en un archivo
+        save_to_file(codigo_intermedio)
+
+    except Exception as e:  # Captura otras excepciones para asegurar una salida limpia
+        print(f"Error: {e}")
+        print("Finalizando el programa debido a un error inesperado.")
 
 
 # -------------------------------------Fin GUI------------------------------------
+class LexicalError(Exception):
+    pass
+
+
+# ---------------------Analisis lexico--------------------------------------------
+class CustomYAPLLexer(YAPLLexer):
+    def __init__(self, input_stream, error_listener=None):
+        super().__init__(input_stream)
+        self._error_listener = error_listener
+
+    def recover(self, re):
+        position = self._tokenStartCharIndex
+        line = self._tokenStartLine
+        column = position - self._tokenStartColumn
+        offending_token = self._input.getText(
+            self._tokenStartCharIndex, self._input.index
+        )
+        msg = f"Token no reconocido: {offending_token}"
+        if self._error_listener:
+            self._error_listener.lexicalError(line, column, msg)
+        else:
+            print(f"Linea {line}:{column} {msg}")
+        super().recover(re)
+
+
+# ---------------------Fin Analisis lexico--------------------------------------------
 
 # ----------------------Analisis sintanctico--------------------------------------
 # Mensajes de error personalizados
 class CustomErrorListener(ErrorListener):
     def __init__(self):
         super().__init__()
-        self.error_messages = set()  # Ahora es un conjunto para evitar duplicados
+        self.error_messages = set()
+
+    def lexicalError(self, line, column, msg):
+        error_msg = f"Linea {line}:{column} Error Lexico: {msg}"
+        self.error_messages.add(error_msg)
 
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
         # Asegúrate de que cada mensaje de error sea único
@@ -329,6 +378,7 @@ class Symbol:
         parent_class=None,
         default_value=None,
         byte_size=None,
+        value=None,
     ):
         self.name = name
         self.type = type
@@ -345,6 +395,7 @@ class Symbol:
         self.parent_class = parent_class
         self.default_value = default_value
         self.byte_size = byte_size
+        self.value = value
 
 
 class SymbolTable:
@@ -378,6 +429,7 @@ class SymbolTable:
             "Parent Class",
             "Default Value",
             "Byte Size",
+            "Value",
         ]
         table_data = []
         for symbol in self.symbols:
@@ -556,6 +608,7 @@ class MyYAPLListener(YAPLListener):
             "String": 256,  # Suponiendo que un carácter en una cadena ocupa 1 byte
             "Bool": 1,  # Suponiendo que un booleano ocupa 1 byte
         }
+        self.variable_values = {}  # Para inicializar variable_values
 
     def enterClassDef(self, ctx):
         self.has_class = True
@@ -773,6 +826,10 @@ class MyYAPLListener(YAPLListener):
 
         # Comprueba operaciones binarias, que tendrían tres hijos (e.g., expression '+' expression)
         if ctx.getChildCount() == 3:
+            line = ctx.start.line
+            column = ctx.start.column
+            # aqui ayudo a debuguear si estaba tomando bien los valores para hacerle las operaciones aritmeticas
+            # print(f"[Línea {line}, Columna {column}] Operación: {ctx.getChild(1).getText()}, Izquierdo: {ctx.getChild(0).getText()}, Derecho: {ctx.getChild(2).getText()}")
             left_operand = ctx.getChild(0)
             operator = ctx.getChild(1).getText()
             right_operand = ctx.getChild(2)
@@ -859,26 +916,59 @@ class MyYAPLListener(YAPLListener):
         id_semantic_type = symbol.semantic_type
 
         expr_semantic_type = self.get_expression_type(expression)
+        # print(f"Expresión: {expression.getText()}, Tipo Detectado: {expr_semantic_type}")
+
+        # Si la expresión es una simple asignación (ejemplo: var4 = 1)
+        if expression.getChildCount() == 1:
+            single_operand = expression.getChild(0).getText()
+
+            # Si el operando es un número
+            if single_operand.isdigit():
+                # symbol.value = int(single_operand)
+                symbol.value = int(single_operand)
+                # print(f"Valor de {object_id}: {symbol.value}")
+            # Aquí también puedes agregar lógica para otros tipos de operandos si es necesario.
+
+        # Evaluamos y almacenamos el valor si es una operación aritmética simple.
+
+        # Evaluamos y almacenamos el valor si es una operación aritmética simple.
+        elif expression.getChildCount() == 3:
+            left_operand = expression.getChild(0).getText()
+            operator = expression.getChild(1).getText()
+            right_operand = expression.getChild(2).getText()
+
+            # Si ambos operandos son números, los evaluamos.
+            if left_operand.isdigit() and right_operand.isdigit():
+                left_value = int(left_operand)
+                right_value = int(right_operand)
+
+                if operator == "+":
+                    result = left_value + right_value
+                elif operator == "-":
+                    result = left_value - right_value
+                elif operator == "*":
+                    result = left_value * right_value
+                elif operator == "/":
+                    result = left_value / right_value
+                # Puedes añadir otros operadores si es necesario
+
+                # Almacenamos el valor resultante para la variable.
+                symbol.value = result  # Esta es la línea clave. Estamos asignando el valor calculado al símbolo en la tabla de símbolos.
+                # print(f"Valor de {object_id}: {symbol.value}")  # Imprimimos el valor para verificación.
+                # print(f"Evaluación: {left_value} {operator} {right_value} = {result}")
 
         # Verificar la compatibilidad de tipos
         if id_semantic_type != expr_semantic_type:
-            if not self.symbol_table.is_subtype(expr_semantic_type, id_semantic_type):
+            # Caso especial para permitir el casteo implícito de Bool a Int
+            if id_semantic_type == "Int" and expr_semantic_type == "Bool":
+                pass
+            # Caso especial para permitir el casteo implícito de Int a Bool
+            elif id_semantic_type == "Bool" and expr_semantic_type == "Int":
+                pass
+            elif not self.symbol_table.is_subtype(expr_semantic_type, id_semantic_type):
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: El tipo de la expresión no coincide con el tipo declarado para {object_id}."
                 )
-
-        # Verificar la compatibilidad de tipos
-        if id_semantic_type != expr_semantic_type:
-            # Añadir el caso especial para permitir el casteo implícito de Bool a Int
-            if id_semantic_type == "Int" and expr_semantic_type == "Bool":
-                # Aquí podrías hacer la conversión implícita, si es necesario
-                pass
-            # Añadir el caso especial para permitir el casteo implícito de Int a Bool
-            elif id_semantic_type == "Bool" and expr_semantic_type == "Int":
-                # Aquí podrías hacer la conversión implícita, si es necesario
-                pass
-
-        # Aquí también puedes hacer verificaciones adicionales relacionadas con la compatibilidad de tipos entre el identificador y la expresión.
 
     # Método auxiliar para obtener el tipo semántico de una expresión (esto es solo un ejemplo simplificado)
     def get_expression_type(self, expr_ctx):
@@ -891,6 +981,20 @@ class MyYAPLListener(YAPLListener):
             return "String"
         elif expr_ctx.TRUE() or expr_ctx.FALSE():
             return "Bool"
+
+        # Manejo de operaciones aritméticas binarias
+        elif expr_ctx.getChildCount() == 3:
+            # Es una operación binaria (podría ser +, -, *, /, etc.)
+            left_type = self.get_expression_type(expr_ctx.getChild(0))
+            right_type = self.get_expression_type(expr_ctx.getChild(2))
+
+            # Si ambos lados de la operación son del tipo Int, entonces el resultado es Int
+            if left_type == "Int" and right_type == "Int":
+                return "Int"
+
+        # Añadir lógica para otros tipos de expresiones si es necesario.
+        # Por ejemplo, si tienes otros tipos de datos o más operaciones complejas.
+
         else:
             # ... otros casos
             return "Unknown"
