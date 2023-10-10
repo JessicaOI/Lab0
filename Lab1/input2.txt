@@ -12,15 +12,19 @@ class Main {
 };
 
 class SecondClass inherits Main {
-    var3: Bool;
-    var4: Int;
+    var4: Bool;
+
     secondMethod(): Int {
-        while var3 loop
+        while var1 loop
             var4 <- 1;
         pool;
         return var4;
     };
 };
+
+
+
+
 
 
 

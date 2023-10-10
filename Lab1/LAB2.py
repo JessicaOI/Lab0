@@ -780,8 +780,6 @@ class MyYAPLListener(YAPLListener):
         self.symbol_table.print_table()
 
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
-
-        # Manejo de operaciones unarias
         if ctx.getChildCount() == 2:
             operand = ctx.getChild(1)
             operator = ctx.getChild(0).getText()
@@ -810,7 +808,10 @@ class MyYAPLListener(YAPLListener):
             elif operator == "not":
                 # Nuevo código para el operador 'not'
                 if object_id:
-                    symbol = self.symbol_table.get_symbol(object_id, self.current_scope)
+                    # Buscar en las clases base (heredadas)
+                    symbol = self.symbol_table.get_symbol_with_inheritance(
+                        object_id, self.current_scope
+                    )
                     if symbol and symbol.semantic_type != "Bool":
                         self.semantic_errors.append(
                             f"Error en línea {ctx.start.line}: El operando {object_id} debe ser de tipo Bool para la operación 'not'."
@@ -889,7 +890,7 @@ class MyYAPLListener(YAPLListener):
         else:
             # Manejo para otras expresiones (no binarias)
             object_id = ctx.OBJECT_ID().getText() if ctx.OBJECT_ID() else None
-            if object_id and not self.symbol_table.symbol_exists(
+            if object_id and not self.symbol_table.symbol_exists_with_inheritance(
                 object_id, self.current_scope
             ):
                 self.semantic_errors.append(

@@ -12,7 +12,7 @@ end_method main - -> -
 end_class Main - -> -
 begin_class SecondClass - -> -
 label None None -> L3
-= var3 None -> t3
+= var1 None -> t3
 if_false t3 None -> L4
 = 1 None -> var4
 goto None None -> L3
