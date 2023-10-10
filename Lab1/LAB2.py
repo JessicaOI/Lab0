@@ -1015,10 +1015,18 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.processed_statements = set()
         self.contained_statements = {}
         self.visited_nodes = set()
+        self.available_temporaries = []
 
     def new_temp(self):
-        self.temp_counter += 1
-        return f"t{self.temp_counter}"
+        if self.available_temporaries:
+            return self.available_temporaries.pop()
+        else:
+            self.temp_counter += 1
+            return f"t{self.temp_counter}"
+
+    def release_temp(self, temporary):
+        if temporary.startswith("t"):
+            self.available_temporaries.append(temporary)
 
     def new_label(self):
         self.label_counter += 1
@@ -1066,6 +1074,17 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.add_cuadruplo(Cuadruplo("=", value, None, var_name))
             self.processed_statements.add(statement_key)
 
+    def exitExpressionStatement(self, ctx: YAPLParser.ExpressionStatementContext):
+        statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
+
+        if statement_key not in self.processed_statements:
+            var_name = ctx.OBJECT_ID().getText()
+            value = self.process_expression(ctx.expression())
+            self.add_cuadruplo(Cuadruplo("=", value, None, var_name))
+            self.processed_statements.add(statement_key)
+            # Liberar la variable temporal utilizada en esta expresión
+            self.release_temp(value)
+
     def enterReturnStatement(self, ctx: YAPLParser.ReturnStatementContext):
         value = ctx.expression().getText()
         self.add_cuadruplo(Cuadruplo("return", value, None, None))
@@ -1109,14 +1128,10 @@ class GeneradorCodigoIntermedio(YAPLListener):
         for expression_statement in block_statement.getTypedRuleContexts(
             YAPLParser.ExpressionStatementContext
         ):
-            # Verificar si el statement ya ha sido procesado
             if expression_statement not in self.processed_statements:
-                # Si no ha sido procesado, añadirlo al conjunto de statements procesados
                 self.processed_statements.add(expression_statement)
-                # Luego procesarlo
                 self.enterExpressionStatement(expression_statement)
             else:
-                # Si ya ha sido procesado, imprimir un mensaje de debug y omitir el procesamiento
                 print(
                     f"Skipping processed block statement: {expression_statement.getText()}"
                 )
@@ -1237,8 +1252,25 @@ class GeneradorCodigoIntermedio(YAPLListener):
             return (
                 ctx.getText()
             )  # Si es una expresión simple, simplemente retorna su texto
+        elif ctx.getChildCount() == 2:
+            operator = ctx.getChild(0).getText()
+            operand = self.process_expression(ctx.expression(0))
+            temp = self.new_temp()
+            if operator == "-":
+                self.add_cuadruplo(Cuadruplo("negate", operand, None, temp))
+            # Liberar la variable temporal utilizada en esta expresión
+            self.release_temp(operand)
+            return temp
         else:
-            return self.enterExpression(ctx)
+            left_expr = self.process_expression(ctx.expression(0))
+            right_expr = self.process_expression(ctx.expression(1))
+            operator = ctx.getChild(1).getText()
+            temp = self.new_temp()
+            self.add_cuadruplo(Cuadruplo(operator, left_expr, right_expr, temp))
+            # Liberar las variables temporales utilizadas en esta expresión
+            self.release_temp(left_expr)
+            self.release_temp(right_expr)
+            return temp
 
 
 # -------------------------Analisis Semantico---------------------------------------------
