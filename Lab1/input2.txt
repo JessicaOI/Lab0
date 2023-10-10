@@ -1,6 +1,8 @@
 class Main {
     var1: Bool;
     var2: Int;
+    var4: Bool;
+    
     main(): String {
         if var1 then
             var2 <- 10;
@@ -12,15 +14,18 @@ class Main {
 };
 
 class SecondClass inherits Main {
-    var4: Bool;
+    
+    var5 Bool;
 
     secondMethod(): Int {
         while var1 loop
             var4 <- 1;
         pool;
-        return var4;
+        return var5;
     };
 };
+
+
 
 
 

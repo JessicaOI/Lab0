@@ -457,6 +457,7 @@ class SymbolTable:
         if any(
             symbol.name == name and symbol.scope == scope for symbol in self.symbols
         ):
+            print(f"{name} encontrado en {scope}")  # Debugging line
             return True
 
         # Verifica en clases base (si existen)
@@ -465,8 +466,12 @@ class SymbolTable:
             if any(
                 symbol.name == name and symbol.scope == scope for symbol in self.symbols
             ):
+                print(f"{name} encontrado en la clase base {scope}")  # Debugging line
                 return True
 
+        print(
+            f"{name} no encontrado en ninguna parte desde el alcance inicial {scope}"
+        )  # Debugging line
         return False
 
     def get_symbol(self, name, scope):
@@ -890,9 +895,16 @@ class MyYAPLListener(YAPLListener):
         else:
             # Manejo para otras expresiones (no binarias)
             object_id = ctx.OBJECT_ID().getText() if ctx.OBJECT_ID() else None
+            print(
+                f"Verificando {object_id} en el ámbito {self.current_scope}"
+            )  # Debugging line
             if object_id and not self.symbol_table.symbol_exists_with_inheritance(
                 object_id, self.current_scope
             ):
+                # Debugging line: Explicar exactamente qué y cómo se está buscando
+                print(
+                    f"Error Trigger: Se buscó {object_id} en el ámbito {self.current_scope} y no se encontró."
+                )
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración."
                 )
