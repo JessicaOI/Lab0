@@ -1319,15 +1319,6 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 ):
                     self.processed_statements.add(expression_statement)
 
-    def handle_inner_statement(self, statement):
-        first_child_text = statement.getChild(0).getText()
-        if first_child_text == "if":
-            self.enterStatement(statement)
-        elif first_child_text == "while":
-            self.enterWhileStatement(statement)
-        elif statement.expression():
-            self.enterExpressionStatement(statement)
-
     def enterExpression(self, ctx: YAPLParser.ExpressionContext):
         if ctx.getChildCount() == 1:
             return (
@@ -1361,7 +1352,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
             operand = self.process_expression(ctx.expression(0))
             temp = self.new_temp()
             if operator == "-":
-                self.add_cuadruplo(Cuadruplo("negate", operand, None, temp))
+                self.add_cuadruplo(Cuadruplo("menos", operand, None, temp))
             # Liberar la variable temporal utilizada en esta expresión
             self.release_temp(operand)
             return temp
