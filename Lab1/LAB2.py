@@ -207,6 +207,7 @@ def execute_functions():
             generador, tree
         )  # Utilizamos el walker con el GeneradorCodigoIntermedio
         codigo_intermedio = generador.get_codigo_intermedio()
+        generador.imprimir_codigo_intermedio()
 
         # Guarda el código intermedio en un archivo
         save_to_file(codigo_intermedio)
@@ -1239,7 +1240,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
         ):
             # Si es así, reemplace el último cuadruplo con el nuevo.
             self.cuadruplos[-1] = cuadruplo
-            print(f"Replacing cuadruplo: {last_cuadruplo} -> {cuadruplo}")
+            # print(f"Replacing cuadruplo: {last_cuadruplo} -> {cuadruplo}")
         elif all(c != cuadruplo for c in self.cuadruplos):
             # Si el cuadruplo no está en la lista en absoluto, añádelo.
             self.cuadruplos.append(cuadruplo)
@@ -1394,6 +1395,15 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.release_temp(left_expr)
             self.release_temp(right_expr)
             return temp
+
+    def imprimir_codigo_intermedio(self):
+        print(f"{'':<15}{'Operador':<15}{'Arg 1':<15}{'Arg 2':<15}{'Resultado'}")
+        print("-" * 80)
+        for i, cuad in enumerate(self.cuadruplos):
+            print(
+                f"{i:<15}{cuad.operador:<15}{cuad.arg1 if cuad.arg1 is not None else '':<15}"
+                f"{cuad.arg2 if cuad.arg2 is not None else '':<15}{cuad.destino if cuad.destino is not None else ''}"
+            )
 
 
 # -------------------------Analisis Semantico---------------------------------------------
