@@ -14,6 +14,7 @@ from copy import deepcopy
 import tkinter as tk
 from tkinter import filedialog, messagebox, Text, simpledialog
 import inspect
+import traceback
 
 # ---------------------GUI------------------------------------------------------------
 text_editor = None
@@ -198,6 +199,7 @@ def execute_functions():
                 print("Error Semántico: " + error)
 
             print("Finalizando el programa.")
+            return
 
         # Usando el Generador
         generador = GeneradorCodigoIntermedio()
@@ -210,6 +212,8 @@ def execute_functions():
         save_to_file(codigo_intermedio)
 
     except Exception as e:  # Captura otras excepciones para asegurar una salida limpia
+        
+        #print(traceback.format_exc())
         print(f"Error: {e}")
         print("Finalizando el programa debido a un error inesperado.")
 
@@ -705,6 +709,7 @@ class MyYAPLListener(YAPLListener):
         self.current_scope = "global"
 
     def enterFeature(self, ctx):
+        #print(f"Entrando a enterFeature en línea {ctx.start.line}: {ctx.getText()[:100]}...")
         self.has_attribute = True
 
         # Obteniendo los object_ids y type_ids

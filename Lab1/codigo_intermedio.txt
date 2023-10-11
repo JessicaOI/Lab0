@@ -7,7 +7,7 @@ label None None -> L1
 + 8 9 -> t2
 = t2 None -> var2
 label None None -> L2
-return "Este es un String, no un Int" None -> None
+return var2 None -> None
 end_method main - -> -
 end_class Main - -> -
 begin_class SecondClass - -> -
