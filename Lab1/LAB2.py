@@ -212,8 +212,8 @@ def execute_functions():
         save_to_file(codigo_intermedio)
 
     except Exception as e:  # Captura otras excepciones para asegurar una salida limpia
-        
-        #print(traceback.format_exc())
+
+        # print(traceback.format_exc())
         print(f"Error: {e}")
         print("Finalizando el programa debido a un error inesperado.")
 
@@ -382,7 +382,7 @@ class Symbol:
         parent_class=None,
         default_value=None,
         byte_size=None,
-        value=None,
+        # value=None,
     ):
         self.name = name
         self.type = type
@@ -399,7 +399,7 @@ class Symbol:
         self.parent_class = parent_class
         self.default_value = default_value
         self.byte_size = byte_size
-        self.value = value
+        # self.value = value
 
 
 class SymbolTable:
@@ -433,7 +433,7 @@ class SymbolTable:
             "Parent Class",
             "Default Value",
             "Byte Size",
-            "Value",
+            # "Value",
         ]
         table_data = []
         for symbol in self.symbols:
@@ -461,7 +461,7 @@ class SymbolTable:
         if any(
             symbol.name == name and symbol.scope == scope for symbol in self.symbols
         ):
-            print(f"{name} encontrado en {scope}")  # Debugging line
+            # print(f"{name} encontrado en {scope}")  # Debugging line
             return True
 
         # Verifica en clases base (si existen)
@@ -470,7 +470,7 @@ class SymbolTable:
             if any(
                 symbol.name == name and symbol.scope == scope for symbol in self.symbols
             ):
-                print(f"{name} encontrado en la clase base {scope}")  # Debugging line
+                # print(f"{name} encontrado en la clase base {scope}")  # Debugging line
                 return True
 
         print(
@@ -709,7 +709,7 @@ class MyYAPLListener(YAPLListener):
         self.current_scope = "global"
 
     def enterFeature(self, ctx):
-        #print(f"Entrando a enterFeature en línea {ctx.start.line}: {ctx.getText()[:100]}...")
+        # print(f"Entrando a enterFeature en línea {ctx.start.line}: {ctx.getText()[:100]}...")
         self.has_attribute = True
 
         # Obteniendo los object_ids y type_ids
@@ -900,16 +900,14 @@ class MyYAPLListener(YAPLListener):
         else:
             # Manejo para otras expresiones (no binarias)
             object_id = ctx.OBJECT_ID().getText() if ctx.OBJECT_ID() else None
-            print(
-                f"Verificando {object_id} en el ámbito {self.current_scope}"
-            )  # Debugging line
+            # print(f"Verificando {object_id} en el ámbito {self.current_scope}")  # Debugging line
             if object_id and not self.symbol_table.symbol_exists_with_inheritance(
                 object_id, self.current_scope
             ):
                 # Debugging line: Explicar exactamente qué y cómo se está buscando
-                print(
-                    f"Error Trigger: Se buscó {object_id} en el ámbito {self.current_scope} y no se encontró."
-                )
+                # print(
+                #     f"Error Trigger: Se buscó {object_id} en el ámbito {self.current_scope} y no se encontró."
+                # )
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: Uso del atributo {object_id} antes de su declaración."
                 )
@@ -1225,7 +1223,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
     def add_cuadruplo(self, cuadruplo: Cuadruplo):
         calling_function_name = inspect.stack()[1].function
-        print(f"In {calling_function_name}: Adding quadruple -> {cuadruplo}")
+        # print(f"In {calling_function_name}: Adding quadruple -> {cuadruplo}")
 
         # Si los cuádruplos están vacíos, simplemente añade el cuadruplo.
         if not self.cuadruplos:
@@ -1262,11 +1260,11 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
     def enterStatement(self, ctx: YAPLParser.StatementContext):
 
-        print(f"Attempting to enter statement: {ctx.getText()}")
+        # print(f"Attempting to enter statement: {ctx.getText()}")
 
         # Si el statement ya fue procesado, lo omitimos
         if ctx in self.processed_statements:
-            print(f"Skipping processed statement: {ctx.getText()}")
+            # print(f"Skipping processed statement: {ctx.getText()}")
             # Marcar el statement como procesado
             self.processed_statements.add(ctx)
             return
