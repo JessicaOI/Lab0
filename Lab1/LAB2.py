@@ -983,6 +983,8 @@ class MyYAPLListener(YAPLListener):
             elif id_semantic_type == "Bool" and expr_semantic_type == "Int":
                 pass
             elif not self.symbol_table.is_subtype(expr_semantic_type, id_semantic_type):
+                # Agrega este mensaje de depuración
+                print(f"[DEBUG] En la línea {ctx.start.line}: Tipo de {object_id} (id_semantic_type): {id_semantic_type}, Tipo de la expresión (expr_semantic_type): {expr_semantic_type}")
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: El tipo de la expresión no coincide con el tipo declarado para {object_id}."
                 )
@@ -990,8 +992,9 @@ class MyYAPLListener(YAPLListener):
     # Método auxiliar para obtener el tipo semántico de una expresión (esto es solo un ejemplo simplificado)
     def get_expression_type(self, expr_ctx):
         if expr_ctx is None:
-            # manejar el caso en que expr_ctx es None
             return None
+
+        # Si es un literal
         if expr_ctx.INT():
             return "Int"
         elif expr_ctx.STRING():
@@ -999,22 +1002,34 @@ class MyYAPLListener(YAPLListener):
         elif expr_ctx.TRUE() or expr_ctx.FALSE():
             return "Bool"
 
-        # Manejo de operaciones aritméticas binarias
+        # Si es un identificador, puede ser una variable o una función sin argumentos
+        if expr_ctx.OBJECT_ID():
+            object_id = expr_ctx.OBJECT_ID().getText()
+            symbol = self.symbol_table.get_symbol(object_id, self.current_scope)
+            if symbol:
+                return symbol.semantic_type
+
+        # Si la expresión es una llamada a función
+        if expr_ctx.getChildCount() > 1 and expr_ctx.getChild(1).getText() == '(':
+            function_name = expr_ctx.getChild(0).getText()
+            symbol = self.symbol_table.get_symbol(function_name, self.current_scope)
+            if symbol:
+                # Aquí podrías comprobar la coincidencia de los argumentos con los parámetros de la función si es necesario.
+                # Debes extraer los argumentos de expr_ctx y compararlos con los parámetros esperados para la función.
+                return symbol.semantic_type  # Devuelve el tipo de retorno de la función
+
+        # Para operaciones aritméticas binarias
         elif expr_ctx.getChildCount() == 3:
-            # Es una operación binaria (podría ser +, -, *, /, etc.)
             left_type = self.get_expression_type(expr_ctx.getChild(0))
             right_type = self.get_expression_type(expr_ctx.getChild(2))
-
             # Si ambos lados de la operación son del tipo Int, entonces el resultado es Int
             if left_type == "Int" and right_type == "Int":
                 return "Int"
+            # Aquí puedes añadir más condiciones para otros tipos de operaciones
 
-        # Añadir lógica para otros tipos de expresiones si es necesario.
-        # Por ejemplo, si tienes otros tipos de datos o más operaciones complejas.
+        # Si ninguna de las condiciones anteriores coincide, devuelve "Unknown"
+        return "Unknown"
 
-        else:
-            # ... otros casos
-            return "Unknown"
 
     def enterStatement(self, ctx):
         # La siguiente condición verifica si la sentencia es un 'if' o un 'while'
