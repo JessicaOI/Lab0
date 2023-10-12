@@ -1188,12 +1188,16 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.exit_scope()
 
     def enterFeature(self, ctx: YAPLParser.FeatureContext):
-        if ctx.OBJECT_ID() and ctx.COLON():
+
+        if ctx.OBJECT_ID() and ctx.COLON() and not ctx.LPAREN():
             var_name = ctx.OBJECT_ID().getText()
+            print("Variable declaration detected: ", var_name)
             self.scopes[self.current_scope][var_name] = None
             # No generamos cuadruplo de inicialización aquí.
-        elif ctx.OBJECT_ID() and ctx.LPAREN() and not ctx.RPAREN():
+
+        elif ctx.OBJECT_ID() and ctx.LPAREN() and ctx.RPAREN():
             func_name = ctx.OBJECT_ID().getText()
+            print("Function declaration detected: ", func_name)
             self.enter_scope(func_name)
             self.add_cuadruplo(Cuadruplo("begin_method", func_name, "-", "-"))
 
@@ -1212,20 +1216,21 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.add_cuadruplo(Cuadruplo("=", value, None, var_name))
             self.processed_statements.add(statement_key)
 
-    def exitExpressionStatement(self, ctx: YAPLParser.ExpressionStatementContext):
-        statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
+    # def exitExpressionStatement(self, ctx: YAPLParser.ExpressionStatementContext):
+    #     statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
 
-        if statement_key not in self.processed_statements:
-            var_name = ctx.OBJECT_ID().getText()
-            value = self.process_expression(ctx.expression())
-            self.add_cuadruplo(Cuadruplo("=", value, None, var_name))
-            self.processed_statements.add(statement_key)
-            # Liberar la variable temporal utilizada en esta expresión
-            self.release_temp(value)
+    #     if statement_key not in self.processed_statements:
+    #         var_name = ctx.OBJECT_ID().getText()
+    #         value = self.process_expression(ctx.expression())
+    #         self.add_cuadruplo(Cuadruplo("=", value, None, var_name))
+    #         self.processed_statements.add(statement_key)
+    #         # Liberar la variable temporal utilizada en esta expresión
+    #         self.release_temp(value)
 
     def enterReturnStatement(self, ctx: YAPLParser.ReturnStatementContext):
-        value = ctx.expression().getText()
+        value = self.process_expression(ctx.expression())
         self.add_cuadruplo(Cuadruplo("return", value, None, None))
+
 
     def has_else_block(self, ctx):
         return any(child.getText() == "else" for child in ctx.getChildren())
@@ -1354,62 +1359,49 @@ class GeneradorCodigoIntermedio(YAPLListener):
                     self.processed_statements.add(expression_statement)
 
     def process_expression(self, ctx: YAPLParser.ExpressionContext):
-        # Verificar si la operación ya ha sido procesada
         operation = ctx.getText()
-        if operation in self.processed_operations:
-            return operation
 
-        # Si la operación no se ha procesado aún, continuar con el procesamiento
+        # Si es una expresión simple, simplemente retorna su texto
         if ctx.getChildCount() == 1:
             return ctx.getText()
+        
+        # Operación unaria
         elif ctx.getChildCount() == 2:
             operator = ctx.getChild(0).getText()
             operand = self.process_expression(ctx.expression(0))
             temp = self.new_temp()
             if operator == "-":
                 self.add_cuadruplo(Cuadruplo("negate", operand, None, temp))
-            self.processed_operations.add(
-                operation
-            )  # Marcar la operación como procesada
-            return temp
-        else:
-            left_expr = self.process_expression(ctx.expression(0))
-            right_expr = self.process_expression(ctx.expression(1))
-            operator = ctx.getChild(1).getText()
-            temp = self.new_temp()
-            self.add_cuadruplo(Cuadruplo(operator, left_expr, right_expr, temp))
-            self.processed_operations.add(
-                operation
-            )  # Marcar la operación como procesada
-            return temp
-
-    def get_codigo_intermedio(self):
-        return "\n".join(str(cuad) for cuad in self.cuadruplos)
-
-    def process_expression(self, ctx: YAPLParser.ExpressionContext):
-        if ctx.getChildCount() == 1:
-            return (
-                ctx.getText()
-            )  # Si es una expresión simple, simplemente retorna su texto
-        elif ctx.getChildCount() == 2:
-            operator = ctx.getChild(0).getText()
-            operand = self.process_expression(ctx.expression(0))
-            temp = self.new_temp()
-            if operator == "-":
-                self.add_cuadruplo(Cuadruplo("menos", operand, None, temp))
             # Liberar la variable temporal utilizada en esta expresión
             self.release_temp(operand)
             return temp
+        
+        # Llamada a función
+        elif ctx.LPAREN():
+            function_name = ctx.OBJECT_ID().getText()
+            temp = self.new_temp()
+            arguments = [self.process_expression(expr) for expr in ctx.expression()]
+            
+            self.add_cuadruplo(Cuadruplo("call", function_name, f"{arguments[0]},{arguments[1]}", temp))
+            for arg in arguments:
+                self.release_temp(arg)
+            return temp
+        
+        # Operación binaria
         else:
             left_expr = self.process_expression(ctx.expression(0))
             right_expr = self.process_expression(ctx.expression(1))
             operator = ctx.getChild(1).getText()
             temp = self.new_temp()
             self.add_cuadruplo(Cuadruplo(operator, left_expr, right_expr, temp))
-            # Liberar las variables temporales utilizadas en esta expresión
             self.release_temp(left_expr)
             self.release_temp(right_expr)
             return temp
+
+        
+
+    def get_codigo_intermedio(self):
+        return "\n".join(str(cuad) for cuad in self.cuadruplos)
 
     def imprimir_codigo_intermedio(self):
         print(f"{'':<15}{'Operador':<15}{'Arg 1':<15}{'Arg 2':<15}{'Resultado'}")
