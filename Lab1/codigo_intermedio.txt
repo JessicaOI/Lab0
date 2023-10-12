@@ -6,7 +6,7 @@ end_method sum - -> -
 begin_method main - -> -
 = var1 None -> t2
 if_false t2 None -> L1
-call sum 5,7 -> t3
+invoke_func sum 5,7 -> t3
 = t3 None -> var3
 goto None None -> L2
 label None None -> L1

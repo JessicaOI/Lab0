@@ -6,20 +6,9 @@ class Main {
         if var1 then
             var2 <- 10;
         else
-            var2 <- 8+9;
+            var2 <- 8+9+10+90;
         fi;
         return "Este es un String, no un Int";
-    };
-};
-
-class SecondClass inherits Main {
-    var4 Bool;
-
-    secondMethod(): Int {
-        while var1 loop
-            var4 <- 1;
-        pool;
-        return var4;
     };
 };
 

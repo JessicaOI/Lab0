@@ -838,66 +838,21 @@ class MyYAPLListener(YAPLListener):
 
         # Comprueba operaciones binarias, que tendrían tres hijos (e.g., expression '+' expression)
         if ctx.getChildCount() == 3:
-            line = ctx.start.line
-            column = ctx.start.column
-            # aqui ayudo a debuguear si estaba tomando bien los valores para hacerle las operaciones aritmeticas
-            # print(f"[Línea {line}, Columna {column}] Operación: {ctx.getChild(1).getText()}, Izquierdo: {ctx.getChild(0).getText()}, Derecho: {ctx.getChild(2).getText()}")
             left_operand = ctx.getChild(0)
             operator = ctx.getChild(1).getText()
             right_operand = ctx.getChild(2)
-            # Aquí comprobamos si la operación es aritmética
-            if operator in ["+", "-", "*", "/"]:
-                operands = [left_operand, right_operand]
-                for operand in operands:
-                    # Aquí asumimos que cada operand es otra ExpressionContext y tiene un método OBJECT_ID()
-                    object_id = (
-                        operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
-                    )
-                    if object_id:
-                        # Obtiene el símbolo correspondiente al identificador
-                        symbol = self.symbol_table.get_symbol(
-                            object_id, self.current_scope
-                        )
-                        if symbol and symbol.semantic_type != "Int":
-                            self.semantic_errors.append(
-                                f"Error en línea {ctx.start.line}: El operando {object_id} debe ser de tipo Int para la operación {operator}."
-                            )
-                            return
-                    elif operand.INT():  # Si el operando es un número entero literal
-                        continue  # Este es válido, así que sigue adelante
-                    else:
-                        # Aquí puedes manejar otros tipos de operandos que podrían no ser válidos para operaciones aritméticas
-                        self.semantic_errors.append(
-                            f"Error en línea {ctx.start.line}: Operandos no válidos para la operación {operator}."
-                        )
-                        return
-            # Comprobando operaciones de comparación
-            elif operator in ["<", ">", "<=", ">=", "=", "!="]:
-                operands = [left_operand, right_operand]
-                types = []
-                for operand in operands:
-                    object_id = (
-                        operand.OBJECT_ID().getText() if operand.OBJECT_ID() else None
-                    )
-                    if object_id:
-                        symbol = self.symbol_table.get_symbol(
-                            object_id, self.current_scope
-                        )
-                        if symbol:
-                            types.append(symbol.semantic_type)
-                    elif operand.INT():
-                        types.append("Int")
-                    # Aquí puedes añadir más tipos si lo necesitas
-                    else:
-                        self.semantic_errors.append(
-                            f"Error en línea {ctx.start.line}: Operandos no válidos para la operación {operator}."
-                        )
-                        return
 
-                if len(set(types)) > 1:
-                    self.semantic_errors.append(
-                        f"Error en línea {ctx.start.line}: Los operandos para el operador {operator} deben ser del mismo tipo o de clases heredadas de la misma clase."
-                    )
+            # Manejar la recursión para expresiones con múltiples operadores
+            left_type = self.get_expression_type(left_operand)
+            right_type = self.get_expression_type(right_operand)
+
+            # Verificar la compatibilidad de tipos
+            if left_type != "Int" or right_type != "Int":
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: Los operandos para el operador {operator} deben ser de tipo Int."
+                )
+                return
+
         else:
             # Manejo para otras expresiones (no binarias)
             object_id = ctx.OBJECT_ID().getText() if ctx.OBJECT_ID() else None
@@ -949,30 +904,42 @@ class MyYAPLListener(YAPLListener):
         # Evaluamos y almacenamos el valor si es una operación aritmética simple.
 
         # Evaluamos y almacenamos el valor si es una operación aritmética simple.
-        elif expression.getChildCount() == 3:
-            left_operand = expression.getChild(0).getText()
-            operator = expression.getChild(1).getText()
-            right_operand = expression.getChild(2).getText()
+        elif expression.getChildCount() >= 3 and (expression.getChildCount() % 2 == 1):
+            # Obtener e inicializar variables para realizar operaciones
+            result = 0
+            operator = None
 
-            # Si ambos operandos son números, los evaluamos.
-            if left_operand.isdigit() and right_operand.isdigit():
-                left_value = int(left_operand)
-                right_value = int(right_operand)
+            # Iterar sobre cada nodo hijo en la expresión
+            for i in range(expression.getChildCount()):
+                child = expression.getChild(i)
+                child_text = child.getText()
 
-                if operator == "+":
-                    result = left_value + right_value
-                elif operator == "-":
-                    result = left_value - right_value
-                elif operator == "*":
-                    result = left_value * right_value
-                elif operator == "/":
-                    result = left_value / right_value
-                # Puedes añadir otros operadores si es necesario
+                # Si el nodo hijo es un operador
+                if child_text in ["+", "-", "*", "/"]:
+                    operator = child_text
 
-                # Almacenamos el valor resultante para la variable.
-                symbol.value = result  # Esta es la línea clave. Estamos asignando el valor calculado al símbolo en la tabla de símbolos.
-                # print(f"Valor de {object_id}: {symbol.value}")  # Imprimimos el valor para verificación.
-                # print(f"Evaluación: {left_value} {operator} {right_value} = {result}")
+                # Si el nodo hijo es un operando
+                else:
+                    operand = int(child_text) if child_text.isdigit() else None
+
+                    # Si operand no es None y es la primera operación, asignar resultado a operand
+                    if operand is not None and result == 0 and operator is None:
+                        result = operand
+                    # Si operand y operator no son None, realizar la operación
+                    elif operand is not None and operator is not None:
+                        if operator == "+":
+                            result += operand
+                        elif operator == "-":
+                            result -= operand
+                        elif operator == "*":
+                            result *= operand
+                        elif operator == "/":
+                            result /= operand
+                        # Resetear el operador
+                        operator = None
+
+            # Almacenar el valor resultante para la variable.
+            symbol.value = result
 
         # Verificar la compatibilidad de tipos
         if id_semantic_type != expr_semantic_type:
@@ -984,7 +951,9 @@ class MyYAPLListener(YAPLListener):
                 pass
             elif not self.symbol_table.is_subtype(expr_semantic_type, id_semantic_type):
                 # Agrega este mensaje de depuración
-                print(f"[DEBUG] En la línea {ctx.start.line}: Tipo de {object_id} (id_semantic_type): {id_semantic_type}, Tipo de la expresión (expr_semantic_type): {expr_semantic_type}")
+                print(
+                    f"[DEBUG] En la línea {ctx.start.line}: Tipo de {object_id} (id_semantic_type): {id_semantic_type}, Tipo de la expresión (expr_semantic_type): {expr_semantic_type}"
+                )
                 self.semantic_errors.append(
                     f"Error en línea {ctx.start.line}: El tipo de la expresión no coincide con el tipo declarado para {object_id}."
                 )
@@ -1010,7 +979,7 @@ class MyYAPLListener(YAPLListener):
                 return symbol.semantic_type
 
         # Si la expresión es una llamada a función
-        if expr_ctx.getChildCount() > 1 and expr_ctx.getChild(1).getText() == '(':
+        if expr_ctx.getChildCount() > 1 and expr_ctx.getChild(1).getText() == "(":
             function_name = expr_ctx.getChild(0).getText()
             symbol = self.symbol_table.get_symbol(function_name, self.current_scope)
             if symbol:
@@ -1029,7 +998,6 @@ class MyYAPLListener(YAPLListener):
 
         # Si ninguna de las condiciones anteriores coincide, devuelve "Unknown"
         return "Unknown"
-
 
     def enterStatement(self, ctx):
         # La siguiente condición verifica si la sentencia es un 'if' o un 'while'
@@ -1231,7 +1199,6 @@ class GeneradorCodigoIntermedio(YAPLListener):
         value = self.process_expression(ctx.expression())
         self.add_cuadruplo(Cuadruplo("return", value, None, None))
 
-
     def has_else_block(self, ctx):
         return any(child.getText() == "else" for child in ctx.getChildren())
 
@@ -1364,29 +1331,37 @@ class GeneradorCodigoIntermedio(YAPLListener):
         # Si es una expresión simple, simplemente retorna su texto
         if ctx.getChildCount() == 1:
             return ctx.getText()
-        
+
         # Operación unaria
         elif ctx.getChildCount() == 2:
             operator = ctx.getChild(0).getText()
             operand = self.process_expression(ctx.expression(0))
             temp = self.new_temp()
             if operator == "-":
-                self.add_cuadruplo(Cuadruplo("negate", operand, None, temp))
+                self.add_cuadruplo(Cuadruplo("menos", operand, None, temp))
             # Liberar la variable temporal utilizada en esta expresión
             self.release_temp(operand)
             return temp
-        
+
         # Llamada a función
         elif ctx.LPAREN():
             function_name = ctx.OBJECT_ID().getText()
             temp = self.new_temp()
             arguments = [self.process_expression(expr) for expr in ctx.expression()]
-            
-            self.add_cuadruplo(Cuadruplo("call", function_name, f"{arguments[0]},{arguments[1]}", temp))
+
+            self.add_cuadruplo(
+                Cuadruplo(
+                    "invoke_func",
+                    function_name,
+                    ",".join(arguments),  # Unir todos los argumentos con comas
+                    temp,
+                )
+            )
+
             for arg in arguments:
                 self.release_temp(arg)
             return temp
-        
+
         # Operación binaria
         else:
             left_expr = self.process_expression(ctx.expression(0))
@@ -1397,8 +1372,6 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.release_temp(left_expr)
             self.release_temp(right_expr)
             return temp
-
-        
 
     def get_codigo_intermedio(self):
         return "\n".join(str(cuad) for cuad in self.cuadruplos)
