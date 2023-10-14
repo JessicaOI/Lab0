@@ -1,4 +1,4 @@
-# Lab2 
+# Proyecto2 
 
 ### Para ver el diseño del codigo intermedio ver el PDF (Laboratorio 2 - compis)
 
