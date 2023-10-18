@@ -1,0 +1,26 @@
+digraph {
+	1 [label=prog]
+	2 [label=expr]
+	-1 -> 2
+	3 [label=expr]
+	4 -> 3
+	4 [label=3]
+	2 -> 4
+	5 [label="+"]
+	4 -> 5
+	6 [label=expr]
+	4 -> 6
+	7 [label=expr]
+	25 -> 7
+	8 [label=2]
+	2 -> 8
+	9 [label="*"]
+	25 -> 9
+	10 [label=expr]
+	25 -> 10
+	11 [label=4]
+	22 -> 11
+	12 [label="
+"]
+	-1 -> 12
+}

@@ -1,0 +1,27 @@
+class Main {
+    var1: Bool;
+    var2: String;
+    var3: Int;
+
+    sum(a: Int, b: Int): Int {
+        return a + b;
+    };
+
+    main(): String {
+        if var1 then
+            var3 <- sum(5, 7);
+        else
+            var2 <- "intento";
+        fi;
+        return var2;
+    };
+};
+
+
+
+
+
+
+
+
+

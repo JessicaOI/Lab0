@@ -1,0 +1,30 @@
+class Main {
+    var1: Int;
+    var2: String;
+    main(): Int {
+        if var1 then
+            var2 <- "true branch";
+        else
+            var2 <- "false branch";
+        fi;
+        return "Este es un String, no un Int";
+    };
+};
+
+
+
+class Main {
+    var1: Bool;
+    var2: String;
+    var3: Int;
+    main(): String {
+        if var1 then
+            var2 <- "true branch";
+        else
+            var2 <- "false branch";
+        fi;
+        return var2;
+    };
+};
+
+

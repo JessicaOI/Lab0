@@ -1,0 +1,23 @@
+class Main {
+    var1: Bool;
+    var2: Int;
+    
+    main(): String {
+        if var1 then
+            var2 <- 10;
+        else
+            var2 <- 8+9+10+90;
+        fi;
+        return "Este es un String, no un Int";
+    };
+};
+
+
+
+
+
+
+
+
+
+
