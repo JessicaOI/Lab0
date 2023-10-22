@@ -1,31 +1,38 @@
-
 .data
 -:  .asciiz ""
-t1:  .asciiz ""
 None:  .asciiz ""
-t2:  .asciiz ""
 L1:  .asciiz ""
-t3:  .asciiz ""
 var3:  .asciiz ""
 L2:  .asciiz ""
 var2:  .asciiz ""
 str0: .asciiz "intento"
 .text
+    li $sp, 10000
 sum:
-    add $t1, $a, $b
-    move $v0, $t1
+    addi $sp, $sp, -12
+    sw $ra, 0($sp)
+    sw $a0, 4($sp)
+    sw $a1, 8($sp)
+    lw $t0, 4($sp)
+    lw $t1, 8($sp)
+    mul $t2, $t1, $a2
+    add $v0, $t0, $t2
+    lw $v0, $t2
     jr $ra
+    lw $ra, 0($sp)
+    addi $sp, $sp, 12
+    jr $ra
+.globl main
 main:
-    lw $t2, var1
-    beq $t2, $zero, L1
-    li $a0, 5
-    li $a1, 7
-    jal sum
-    sw $v0, t3
-    lw $var3, t3
-    j None
+    lw $$t1, var1
+    sw $$t1, $t1
+    beq $t4, $zero, L1
+    lw $$t1, $t3
+    sw $$t1, var3
+    j L2
 None:
-    la $var2, str0
+    la $t5, str0
+    sw $t5, var2
 None:
-    move $v0, $var2
+    lw $v0, var2
     jr $ra

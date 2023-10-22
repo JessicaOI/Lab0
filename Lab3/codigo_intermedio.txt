@@ -1,21 +1,21 @@
-begin_class Main - -> -
-begin_method sum - -> -
-* b t1 -> $t1
-+ a $t1 -> $t2
-return $t2 None -> None
-end_method sum - -> -
-begin_method main - -> -
-= var1 None -> $t1
-if_false $t1 None -> L1
-param 5 None -> None
-param 7 None -> None
-param 9 None -> None
-call sum 3 -> $t3
-= $t3 None -> var3
-goto None None -> L2
-label None None -> L1
-= "intento" None -> var2
-label None None -> L2
-return var2 None -> None
-end_method main - -> -
-end_class Main - -> -
+begin_class Main - -
+begin_method sum - -
+* b t1 $t1
++ a $t1 $t2
+return $t2 None None
+end_method sum - -
+begin_method main - -
+= var1 None $t1
+if_false $t1 None L1
+param 5 None None
+param 7 None None
+param 9 None None
+invoke_function sum 3 $t3
+= $t3 None var3
+goto None None L2
+label None None L1
+= "intento" None var2
+label None None L2
+return var2 None None
+end_method main - -
+end_class Main - -

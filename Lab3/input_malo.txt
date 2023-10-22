@@ -18,3 +18,4 @@ class SecondClass inherits MainClass {
         return var1;
     }
 
+
