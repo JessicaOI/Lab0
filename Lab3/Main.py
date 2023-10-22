@@ -19,6 +19,7 @@ import traceback
 # ---------------------GUI------------------------------------------------------------
 text_editor = None
 console = None
+
 # Se crear el el GUI el espacio del editor de texto
 def redraw_line_numbers(canvas, text_widget):
     canvas.delete("all")  # limpiamos todo lo que estaba dibujado anteriormente
@@ -150,6 +151,8 @@ class IOWrapper:
 # Al presionar el boton se ejecuta el programa en el GUI
 def execute_functions():
     global file_path
+    global codigo_intermedio
+
     input_stream = FileStream(file_path)
 
     error_listener = CustomErrorListener()
@@ -208,6 +211,11 @@ def execute_functions():
         )  # Utilizamos el walker con el GeneradorCodigoIntermedio
         codigo_intermedio = generador.get_codigo_intermedio()
         generador.imprimir_codigo_intermedio()
+        # Uso de la clase mips
+        translator = IntermediateToMIPS()
+        mips_code = translator.generate_code(codigo_intermedio)  # 'your_intermediate_code' es el código intermedio que has proporcionado
+        translator.save_mips_to_file(mips_code,"mi_archivo_mips.txt")
+
 
         # Guarda el código intermedio en un archivo
         save_to_file(codigo_intermedio)
@@ -1092,7 +1100,9 @@ class MyYAPLListener(YAPLListener):
         # --------Imprimir tabla de simbolos--------
         # print(tabulate(self.table, headers=headers, tablefmt="pretty"))
 
+# -------------------------Fin Analisis Semantico---------------------------------------------
 
+# -------------------------Generador codigo intermedio---------------------------------------------
 class Cuadruplo:
     def __init__(self, operador, arg1=None, arg2=None, destino=None):
         self.operador = operador
@@ -1386,7 +1396,75 @@ class GeneradorCodigoIntermedio(YAPLListener):
             )
 
 
-# -------------------------Analisis Semantico---------------------------------------------
+# -------------------------Fin Generador codigo intermedio---------------------------------------------
+
+# -------------------------Traductor a lenguaje ensamblador MIPS---------------------------------------------
+class IntermediateToMIPS:
+
+    def __init__(self):
+        self.output_code = []
+        self.label_counter = 0
+        self.data_section = []  # Añadido para manejar la sección de datos
+        self.strings_counter = 0  # Añadido para manejar múltiples cadenas
+
+    def add_string_to_data(self, str_value):
+        # Guarda una cadena en la sección de datos y devuelve su etiqueta
+        label = f"str{self.strings_counter}"
+        self.data_section.append(f"{label}: .asciiz {str_value}")
+        self.strings_counter += 1
+        return label
+
+    def generate_code(self, intermediate_code):
+        lines = intermediate_code.split("\n")
+
+        for line in lines:
+            tokens = line.split()
+            # print(f"Procesando línea: {line}")  # Añade esta línea
+            # print(f"Tokens: {tokens}")  # Y esta línea
+            if not tokens:
+                continue
+
+            cmd = tokens[0]
+            
+            if cmd == "+":
+                self.output_code.append(f"add ${tokens[3]}, ${tokens[1]}, ${tokens[2]}")
+            elif cmd == "=":
+                if tokens[1].isnumeric():
+                    self.output_code.append(f"li ${tokens[3]}, {tokens[1]}")
+                elif tokens[1][0] == '"':
+                    string_label = self.add_string_to_data(tokens[1])
+                    self.output_code.append(f"la ${tokens[3]}, {string_label}")
+                else:
+                    self.output_code.append(f"move ${tokens[3]}, ${tokens[1]}")
+            elif cmd == "if_false":
+                self.output_code.append(f"beq ${tokens[1]}, $zero, {tokens[3]}")
+            elif cmd == "goto":
+                self.output_code.append(f"j {tokens[3]}")
+            elif cmd == "label":
+                self.output_code.append(f"{tokens[3]}:")
+            elif cmd == "invoke_func":
+                args = tokens[2].split(',')
+                self.output_code.append(f"li $a0, {args[0]}")
+                self.output_code.append(f"li $a1, {args[1]}")
+                self.output_code.append("jal sum")
+                self.output_code.append(f"move ${tokens[4]}, $v0")
+            elif cmd == "return":
+                self.output_code.append(f"move $v0, ${tokens[1]}")
+                self.output_code.append("jr $ra")
+
+        # Combina las secciones de datos y texto para formar el código completo
+        final_code = "\n.data\n" + "\n".join(self.data_section) + "\n.text\n" + "\n".join(self.output_code)
+        return final_code
+
+    def save_mips_to_file(self, mips_code, filename="output_mips.txt"):
+        with open(filename, 'w') as file:
+            file.write(mips_code)
+
+
+
+
+
+
 def main():
     global text_editor
 

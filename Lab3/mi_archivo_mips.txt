@@ -1,0 +1,20 @@
+
+.data
+str0: .asciiz "intento"
+.text
+add $->, $a, $b
+move $v0, $t1
+jr $ra
+move $->, $var1
+beq $t2, $zero, ->
+li $a0, 5
+li $a1, 7
+jal sum
+move $t3, $v0
+move $->, $t3
+j ->
+->:
+la $->, str0
+->:
+move $v0, $var2
+jr $ra
