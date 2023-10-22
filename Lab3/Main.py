@@ -1133,16 +1133,27 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.processed_temporaries = set()
         self.processed_operations = set()
 
+    # Método para obtener una nueva variable temporal
     def new_temp(self):
         if self.available_temporaries:
             return self.available_temporaries.pop()
         else:
             self.temp_counter += 1
-            return f"t{self.temp_counter}"
+            return f"$t{self.temp_counter}"
 
+    # Método para liberar una variable temporal después de su uso
     def release_temp(self, temporary):
-        if temporary.startswith("t"):
-            self.available_temporaries.append(temporary)
+        if temporary.startswith("$t"):
+            if temporary not in self.processed_temporaries:
+                self.available_temporaries.append(temporary)
+            else:
+                print(f"Skipping release of {temporary} - still in use.")
+
+    def is_temporary_in_use_elsewhere(self, temp):
+        for quad in self.cuadruplos:
+            if temp in (quad.arg1, quad.arg2):
+                return True
+        return False
 
     def new_label(self):
         self.label_counter += 1
@@ -1193,6 +1204,8 @@ class GeneradorCodigoIntermedio(YAPLListener):
             value = self.process_expression(ctx.expression())
             self.add_cuadruplo(Cuadruplo("=", value, None, var_name))
             self.processed_statements.add(statement_key)
+            # Liberar la variable temporal utilizada en esta expresión, si es aplicable.
+            self.release_temp(value)
 
     # def exitExpressionStatement(self, ctx: YAPLParser.ExpressionStatementContext):
     #     statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
@@ -1276,6 +1289,8 @@ class GeneradorCodigoIntermedio(YAPLListener):
             if first_child == "if":
                 self.inside_block = True
                 temp = self.new_temp()
+                if self.is_temporary_in_use_elsewhere(temp):
+                    self.processed_temporaries.add(temp)
                 condition = self.process_expression(ctx.expression())
                 self.add_cuadruplo(Cuadruplo("=", condition, None, temp))
 
@@ -1299,6 +1314,8 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 self.add_cuadruplo(Cuadruplo("label", None, None, label_start))
 
                 temp = self.new_temp()
+                if self.is_temporary_in_use_elsewhere(temp):
+                    self.processed_temporaries.add(temp)
                 condition = self.process_expression(ctx.expression())
                 self.add_cuadruplo(Cuadruplo("=", condition, None, temp))
 
@@ -1347,6 +1364,8 @@ class GeneradorCodigoIntermedio(YAPLListener):
             operator = ctx.getChild(0).getText()
             operand = self.process_expression(ctx.expression(0))
             temp = self.new_temp()
+            if self.is_temporary_in_use_elsewhere(temp):
+                self.processed_temporaries.add(temp)
             if operator == "-":
                 self.add_cuadruplo(Cuadruplo("menos", operand, None, temp))
             # Liberar la variable temporal utilizada en esta expresión
@@ -1357,19 +1376,17 @@ class GeneradorCodigoIntermedio(YAPLListener):
         elif ctx.LPAREN():
             function_name = ctx.OBJECT_ID().getText()
             temp = self.new_temp()
+            if self.is_temporary_in_use_elsewhere(temp):
+                self.processed_temporaries.add(temp)
             arguments = [self.process_expression(expr) for expr in ctx.expression()]
 
-            self.add_cuadruplo(
-                Cuadruplo(
-                    "invoke_func",
-                    function_name,
-                    ",".join(arguments),  # Unir todos los argumentos con comas
-                    temp,
-                )
-            )
-
+            # Utilizar instrucciones 'param' para cada argumento
             for arg in arguments:
-                self.release_temp(arg)
+                self.add_cuadruplo(Cuadruplo("param", arg, None, None))
+
+            # Instrucción 'call' para la llamada a la función
+            self.add_cuadruplo(Cuadruplo("call", function_name, len(arguments), temp))
+
             return temp
 
         # Operación binaria
@@ -1378,7 +1395,10 @@ class GeneradorCodigoIntermedio(YAPLListener):
             right_expr = self.process_expression(ctx.expression(1))
             operator = ctx.getChild(1).getText()
             temp = self.new_temp()
+            if self.is_temporary_in_use_elsewhere(temp):
+                self.processed_temporaries.add(temp)
             self.add_cuadruplo(Cuadruplo(operator, left_expr, right_expr, temp))
+            # Importante: liberar las temporales después de usarlas
             self.release_temp(left_expr)
             self.release_temp(right_expr)
             return temp
