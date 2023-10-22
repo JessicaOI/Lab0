@@ -1,17 +1,17 @@
-begin_class Main - -> -
-begin_method sum - -> -
-+ a b -> t1
-return t1 None -> None
-end_method sum - -> -
-begin_method main - -> -
-= var1 None -> t2
-if_false t2 None -> L1
-invoke_func sum 5,7 -> t3
-= t3 None -> var3
-goto None None -> L2
-label None None -> L1
-= "intento" None -> var2
-label None None -> L2
-return var2 None -> None
-end_method main - -> -
-end_class Main - -> -
+begin_class Main - -
+begin_method sum - -
++ a b t1
+return t1 None None
+end_method sum - -
+begin_method main - -
+= var1 None t2
+if_false t2 None L1
+invoke_func sum 5,7 t3
+= t3 None var3
+goto None None L2
+label None None L1
+= "intento" None var2
+label None None L2
+return var2 None None
+end_method main - -
+end_class Main - -

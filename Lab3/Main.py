@@ -1111,7 +1111,7 @@ class Cuadruplo:
         self.destino = destino
 
     def __str__(self):
-        return f"{self.operador} {self.arg1} {self.arg2} -> {self.destino}"
+        return f"{self.operador} {self.arg1} {self.arg2} {self.destino}"
 
 
 class GeneradorCodigoIntermedio(YAPLListener):
@@ -1400,68 +1400,97 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
 # -------------------------Traductor a lenguaje ensamblador MIPS---------------------------------------------
 class IntermediateToMIPS:
-
     def __init__(self):
         self.output_code = []
-        self.label_counter = 0
-        self.data_section = []  # Añadido para manejar la sección de datos
-        self.strings_counter = 0  # Añadido para manejar múltiples cadenas
+        self.data_section = []
+        self.strings_counter = 0
+        self.variables = {}
+
+    def add_variable(self, var_name, var_type="Unknown"):
+        if var_name not in self.variables:
+            if var_type == "String" or var_type == "Unknown":
+                self.data_section.append(f"{var_name}:  .asciiz \"\"")
+            else:
+                self.data_section.append(f"{var_name}:  .word 0")
+            self.variables[var_name] = var_type
 
     def add_string_to_data(self, str_value):
-        # Guarda una cadena en la sección de datos y devuelve su etiqueta
         label = f"str{self.strings_counter}"
         self.data_section.append(f"{label}: .asciiz {str_value}")
         self.strings_counter += 1
         return label
 
+    def detect_variables(self, intermediate_code):
+        command_keywords = ["+", "=", "if_false", "goto", "label", "invoke_func", "return", "begin_method", "end_method"]
+        registers = ["$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7", "$t8", "$t9", "$a0", "$a1", "$a2", "$v0", "$zero", "$ra"]
+        
+        lines = intermediate_code.strip().split("\n")
+        for line in lines:
+            tokens = line.split()
+            if len(tokens) <= 1:
+                continue
+            dest = tokens[-1]
+            
+            # If the destination token is a potential variable and not a register or command keyword
+            if dest not in command_keywords and dest not in registers and not dest.isnumeric() and dest[0] not in ['"', "'"]:
+                self.add_variable(dest)
+
     def generate_code(self, intermediate_code):
-        lines = intermediate_code.split("\n")
+        self.detect_variables(intermediate_code)
+        
+        lines = intermediate_code.strip().split("\n")
+        current_function = None
 
         for line in lines:
             tokens = line.split()
-            # print(f"Procesando línea: {line}")  # Añade esta línea
-            # print(f"Tokens: {tokens}")  # Y esta línea
+            
             if not tokens:
                 continue
 
             cmd = tokens[0]
-            
+
+            if cmd == "begin_method":
+                current_function = tokens[1]
+                self.output_code.append(f"{current_function}:")
+                continue
+
+            if cmd == "end_method":
+                current_function = None
+                continue
+
             if cmd == "+":
-                self.output_code.append(f"add ${tokens[3]}, ${tokens[1]}, ${tokens[2]}")
+                self.output_code.append(f"    add ${tokens[3]}, ${tokens[1]}, ${tokens[2]}")
             elif cmd == "=":
                 if tokens[1].isnumeric():
-                    self.output_code.append(f"li ${tokens[3]}, {tokens[1]}")
+                    self.output_code.append(f"    li ${tokens[3]}, {tokens[1]}")
                 elif tokens[1][0] == '"':
                     string_label = self.add_string_to_data(tokens[1])
-                    self.output_code.append(f"la ${tokens[3]}, {string_label}")
+                    self.output_code.append(f"    la ${tokens[3]}, {string_label}")
                 else:
-                    self.output_code.append(f"move ${tokens[3]}, ${tokens[1]}")
+                    self.output_code.append(f"    lw ${tokens[3]}, {tokens[1]}")
             elif cmd == "if_false":
-                self.output_code.append(f"beq ${tokens[1]}, $zero, {tokens[3]}")
+                self.output_code.append(f"    beq ${tokens[1]}, $zero, {tokens[3]}")
             elif cmd == "goto":
-                self.output_code.append(f"j {tokens[3]}")
+                self.output_code.append(f"    j {tokens[1]}")
             elif cmd == "label":
-                self.output_code.append(f"{tokens[3]}:")
+                self.output_code.append(f"{tokens[1]}:")
             elif cmd == "invoke_func":
                 args = tokens[2].split(',')
-                self.output_code.append(f"li $a0, {args[0]}")
-                self.output_code.append(f"li $a1, {args[1]}")
-                self.output_code.append("jal sum")
-                self.output_code.append(f"move ${tokens[4]}, $v0")
+                self.output_code.append(f"    li $a0, {args[0]}")
+                self.output_code.append(f"    li $a1, {args[1]}")
+                self.output_code.append(f"    jal {tokens[1]}")
+                if tokens[3] in self.variables:
+                    self.output_code.append(f"    sw $v0, {tokens[3]}")
             elif cmd == "return":
-                self.output_code.append(f"move $v0, ${tokens[1]}")
-                self.output_code.append("jr $ra")
+                self.output_code.append(f"    move $v0, ${tokens[1]}")
+                self.output_code.append("    jr $ra")
 
-        # Combina las secciones de datos y texto para formar el código completo
         final_code = "\n.data\n" + "\n".join(self.data_section) + "\n.text\n" + "\n".join(self.output_code)
         return final_code
 
     def save_mips_to_file(self, mips_code, filename="output_mips.txt"):
         with open(filename, 'w') as file:
             file.write(mips_code)
-
-
-
 
 
 
