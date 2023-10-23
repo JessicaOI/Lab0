@@ -213,9 +213,10 @@ def execute_functions():
         generador.imprimir_codigo_intermedio()
         # Uso de la clase mips
         translator = IntermediateToMIPS()
-        mips_code = translator.generate_code(codigo_intermedio)  # 'your_intermediate_code' es el código intermedio que has proporcionado
-        translator.save_mips_to_file(mips_code,"mi_archivo_mips.txt")
-
+        mips_code = translator.generate_code(
+            codigo_intermedio
+        )  # 'your_intermediate_code' es el código intermedio que has proporcionado
+        translator.save_mips_to_file(mips_code, "mi_archivo_mips.txt")
 
         # Guarda el código intermedio en un archivo
         save_to_file(codigo_intermedio)
@@ -1100,6 +1101,7 @@ class MyYAPLListener(YAPLListener):
         # --------Imprimir tabla de simbolos--------
         # print(tabulate(self.table, headers=headers, tablefmt="pretty"))
 
+
 # -------------------------Fin Analisis Semantico---------------------------------------------
 
 # -------------------------Generador codigo intermedio---------------------------------------------
@@ -1385,7 +1387,9 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 self.add_cuadruplo(Cuadruplo("param", arg, None, None))
 
             # Instrucción 'call' para la llamada a la función
-            self.add_cuadruplo(Cuadruplo("invoke_function", function_name, len(arguments), temp))
+            self.add_cuadruplo(
+                Cuadruplo("invoke_function", function_name, len(arguments), temp)
+            )
 
             return temp
 
@@ -1425,126 +1429,163 @@ class IntermediateToMIPS:
         self.data_section = []
         self.strings_counter = 0
         self.variables = {}
-        self.stack_pointer_init_val = "10000" # Un valor arbitrario para el inicio de la pila. Ajusta según necesidad.
-        self.output_code.append(f"    li $sp, {self.stack_pointer_init_val}")  # Inicializar el apuntador de pila
+        self.labels = set()
+        self.stack_pointer_init_val = (
+            10000  # Un valor arbitrario para el inicio de la pila.
+        )
 
-    # Método para empujar al stack
-    def push_to_stack(self, register):
-        self.output_code.append(f"    sub $sp, $sp, 4")  # Decrementar el apuntador de pila
-        self.output_code.append(f"    sw {register}, 0($sp)")  # Guardar el valor del registro en la pila
-
-    # Método para desempujar del stack
-    def pop_from_stack(self, register):
-        self.output_code.append(f"    lw {register}, 0($sp)")  # Cargar el valor en el registro
-        self.output_code.append(f"    add $sp, $sp, 4")  # Incrementar el apuntador de pila
-
-
-    def add_variable(self, var_name, var_type="Unknown"):
-        if var_name not in self.variables:
-            if var_type == "String" or var_type == "Unknown":
-                self.data_section.append(f"{var_name}:  .asciiz \"\"")
-            else:
-                self.data_section.append(f"{var_name}:  .word 0")
-            self.variables[var_name] = var_type
-
-    def add_string_to_data(self, str_value):
-        label = f"str{self.strings_counter}"
-        self.data_section.append(f"{label}: .asciiz {str_value}")
+    def add_string_to_data(self, string):
+        string_label = f"str{self.strings_counter}"
         self.strings_counter += 1
-        return label
+        self.data_section.append(f'{string_label}: .asciiz "{string}"')
+        return string_label
 
     def detect_variables(self, intermediate_code):
-        command_keywords = ["+", "=", "if_false", "goto", "label", "invoke_func", "return", "begin_method", "end_method"]
-        registers = ["$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7", "$t8", "$t9", "$a0", "$a1", "$a2", "$v0", "$zero", "$ra"]
-        
         lines = intermediate_code.strip().split("\n")
         for line in lines:
             tokens = line.split()
-            if len(tokens) <= 1:
-                continue
-            dest = tokens[-1]
-            
-            # If the destination token is a potential variable and not a register or command keyword
-            if dest not in command_keywords and dest not in registers and not dest.isnumeric() and dest[0] not in ['"', "'"]:
-                self.add_variable(dest)
+            if len(tokens) >= 3:
+                var_name = tokens[3]
+                # Asegurarse de que no se trate de un registro temporal o una etiqueta de control de flujo
+                if (
+                    var_name not in self.variables
+                    and not var_name.startswith("$")
+                    and not var_name.startswith("L")
+                    and var_name != "None"
+                ):
+                    self.variables[var_name] = f"{var_name}: .word 0"
+        self.data_section.extend(self.variables.values())
+
+    def push_to_stack(self, register):
+        self.output_code.append(f"    subu $sp, $sp, 4")
+        self.output_code.append(f"    sw {register}, 0($sp)")
+
+    def pop_from_stack(self, register):
+        self.output_code.append(f"    lw {register}, 0($sp)")
+        self.output_code.append(f"    addu $sp, $sp, 4")
+
+    def handle_params(self, param_list):
+        # Suponiendo que los parámetros se pasan mediante los registros $a0-$a3
+        # y que no hay más de 4 parámetros
+        for i, param in enumerate(param_list):
+            register = f"$a{i}"
+            if param.startswith('"'):
+                # Es una cadena, así que hay que añadirla a la sección de datos
+                string_label = self.add_string_to_data(param.strip('"'))
+                self.output_code.append(f"    la {register}, {string_label}")
+            else:
+                # Para otros tipos, simplemente cargamos el valor en el registro correspondiente
+                self.output_code.append(f"    lw {register}, {param}")
 
     def generate_code(self, intermediate_code):
         self.detect_variables(intermediate_code)
-        
         lines = intermediate_code.strip().split("\n")
         current_function = None
+        params = []
 
         for line in lines:
             tokens = line.split()
-            
             if not tokens:
                 continue
 
             cmd = tokens[0]
 
-            if cmd == "begin_method":
-                current_function = tokens[1]
-                if current_function == "main":
-                    self.output_code.append(".globl main")
-                self.output_code.append(f"{current_function}:")
-                # Guardar registros en la pila para funciones que no sean main
-                if current_function != "main":
-                    self.output_code.append("    addi $sp, $sp, -12")
-                    self.output_code.append("    sw $ra, 0($sp)")
-                    self.output_code.append("    sw $a0, 4($sp)")
-                    self.output_code.append("    sw $a1, 8($sp)")
+            if cmd == "param":
+                params.append(tokens[1])
                 continue
 
-            if cmd == "end_method":
-                # Restaurar registros de la pila para funciones que no sean main
+            elif cmd == "invoke_function":
+                function_name = tokens[1]
+                for i, param in enumerate(params):
+                    if (
+                        param.isdigit()
+                    ):  # Si el parámetro es un número, lo cargamos directamente
+                        self.output_code.append(f"    li $a{i}, {param}")
+                    else:  # Si es una variable, cargamos la dirección
+                        self.output_code.append(f"    la $a{i}, {param}")
+                self.output_code.append(f"    jal {function_name}")
+                params = []
+                continue
+
+            elif cmd in ["+", "-", "*", "/"]:  # Operaciones aritméticas
+                self.output_code.append(f"    lw $t0, {tokens[1]}")
+                self.output_code.append(f"    lw $t1, {tokens[2]}")
+                operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cmd]
+                self.output_code.append(
+                    f"    {operation} $t2, $t0, $t1"
+                )  # Resultado en $t2
+                if tokens[3].startswith("$"):
+                    self.output_code.append(
+                        f"    move {tokens[3]}, $t2"
+                    )  # Mover resultado si es registro
+                else:
+                    self.output_code.append(
+                        f"    sw $t2, {tokens[3]}"
+                    )  # Guardar resultado si es variable
+                continue
+
+            elif cmd == "=":  # Asignación
+                if tokens[1].startswith('"'):  # Asignación de cadena
+                    string_label = self.add_string_to_data(tokens[1].strip('"'))
+                    self.output_code.append(f"    la $t0, {string_label}")
+                    self.output_code.append(f"    sw $t0, {tokens[3]}")
+                else:  # Asignación de variable o registro
+                    src = tokens[1]
+                    if src.startswith("$"):
+                        self.output_code.append(f"    move $t0, {src}")
+                    else:
+                        self.output_code.append(f"    lw $t0, {src}")
+                    self.output_code.append(f"    sw $t0, {tokens[3]}")
+                continue
+
+            elif cmd == "if_false":
+                self.output_code.append(f"    lw $t0, {tokens[1]}")
+                self.output_code.append(f"    beqz $t0, {tokens[3]}")
+                continue
+
+            elif cmd == "goto":
+                self.output_code.append(f"    j {tokens[3]}")
+                continue
+
+            elif cmd == "label":
+                self.output_code.append(f"{tokens[3]}:")
+                continue
+
+            elif cmd == "return":
+                if tokens[1] != "None":
+                    self.output_code.append(
+                        f"    lw $v0, {tokens[1]}"
+                    )  # Cargar valor de retorno
+                self.output_code.append("    jr $ra")
+                continue
+
+            elif cmd == "begin_method":
+                current_function = tokens[1]
+                self.output_code.append(f"{current_function}:")
                 if current_function != "main":
-                    self.output_code.append("    lw $ra, 0($sp)")
-                    self.output_code.append("    addi $sp, $sp, 12")
-                    self.output_code.append("    jr $ra")
+                    self.push_to_stack("$ra")
+                continue
+
+            elif cmd == "end_method":
+                if current_function != "main":
+                    self.pop_from_stack("$ra")
+                self.output_code.append("    jr $ra")
                 current_function = None
                 continue
 
-            if cmd == "=":
-                if tokens[1].isnumeric():
-                    self.output_code.append(f"    li $t4, {tokens[1]}")
-                elif tokens[1][0] == '"':
-                    string_label = self.add_string_to_data(tokens[1])
-                    self.output_code.append(f"    la $t5, {string_label}")
-                    self.output_code.append(f"    sw $t5, {tokens[3]}")
-                else:
-                    self.output_code.append(f"    lw $$t1, {tokens[1]}")
-                    self.output_code.append(f"    sw $$t1, {tokens[3]}")
-            elif cmd == "if_false":
-                self.output_code.append(f"    beq $t4, $zero, {tokens[3]}")
-            elif cmd == "+":
-                self.output_code.append(f"    lw $t0, 4($sp)")
-                self.output_code.append(f"    lw $t1, 8($sp)")
-                self.output_code.append("    mul $t2, $t1, $a2")
-                self.output_code.append(f"    add $v0, $t0, $t2")
-            elif cmd == "goto":
-                self.output_code.append(f"    j {tokens[3]}")
-            elif cmd == "label":
-                self.output_code.append(f"{tokens[1]}:")
-            elif cmd == "invoke_func":
-                args = tokens[2].split(',')
-                for idx, arg in enumerate(args):
-                    self.output_code.append(f"    li $a{idx}, {arg}")
-                self.output_code.append(f"    jal {tokens[1]}")
-                if tokens[3]:
-                    self.output_code.append(f"    sw $v0, {tokens[3]}")
-            elif cmd == "return":
-                self.output_code.append(f"    lw $v0, {tokens[1]}")
-                self.output_code.append("    jr $ra")
+            # ... [Agregar aquí más lógica para otros comandos si es necesario] ...
 
-        final_code = ".data\n" + "\n".join(self.data_section) + "\n.text\n" + "\n".join(self.output_code)
+        final_code = (
+            ".data\n"
+            + "\n".join(self.data_section)
+            + "\n.text\n"
+            + "\n".join(self.output_code)
+        )
         return final_code
 
-
-
     def save_mips_to_file(self, mips_code, filename="output_mips.txt"):
-        with open(filename, 'w') as file:
+        with open(filename, "w") as file:
             file.write(mips_code)
-
 
 
 def main():

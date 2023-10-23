@@ -1,38 +1,41 @@
 .data
--:  .asciiz ""
-None:  .asciiz ""
-L1:  .asciiz ""
-var3:  .asciiz ""
-L2:  .asciiz ""
-var2:  .asciiz ""
+-: .word 0
+var3: .word 0
+var2: .word 0
 str0: .asciiz "intento"
 .text
-    li $sp, 10000
 sum:
-    addi $sp, $sp, -12
+    subu $sp, $sp, 4
     sw $ra, 0($sp)
-    sw $a0, 4($sp)
-    sw $a1, 8($sp)
-    lw $t0, 4($sp)
-    lw $t1, 8($sp)
-    mul $t2, $t1, $a2
-    add $v0, $t0, $t2
+    lw $t0, b
+    lw $t1, t1
+    mul $t2, $t0, $t1
+    move $t1, $t2
+    lw $t0, a
+    lw $t1, $t1
+    add $t2, $t0, $t1
+    move $t2, $t2
     lw $v0, $t2
     jr $ra
     lw $ra, 0($sp)
-    addi $sp, $sp, 12
+    addu $sp, $sp, 4
     jr $ra
-.globl main
 main:
-    lw $$t1, var1
-    sw $$t1, $t1
-    beq $t4, $zero, L1
-    lw $$t1, $t3
-    sw $$t1, var3
+    lw $t0, var1
+    sw $t0, $t1
+    lw $t0, $t1
+    beqz $t0, L1
+    li $a0, 5
+    li $a1, 7
+    li $a2, 9
+    jal sum
+    move $t0, $t3
+    sw $t0, var3
     j L2
-None:
-    la $t5, str0
-    sw $t5, var2
-None:
+L1:
+    la $t0, str0
+    sw $t0, var2
+L2:
     lw $v0, var2
+    jr $ra
     jr $ra
