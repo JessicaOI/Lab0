@@ -1,14 +1,14 @@
 .data
--: .word 0
 var3: .word 0
 var2: .word 0
 str0: .asciiz "intento"
 .text
+.globl main
 sum:
     subu $sp, $sp, 4
     sw $ra, 0($sp)
     lw $t0, b
-    lw $t1, t1
+    lw $t1, c
     mul $t2, $t0, $t1
     move $t1, $t2
     lw $t0, a

@@ -1452,11 +1452,12 @@ class IntermediateToMIPS:
                     and not var_name.startswith("$")
                     and not var_name.startswith("L")
                     and var_name != "None"
+                    and var_name != "-"  # Añadir esta condición para filtrar la variable inválida
                 ):
                     self.variables[var_name] = f"{var_name}: .word 0"
         self.data_section.extend(self.variables.values())
 
-    def push_to_stack(self, register):
+    def push_to_stack(self, register):  
         self.output_code.append(f"    subu $sp, $sp, 4")
         self.output_code.append(f"    sw {register}, 0($sp)")
 
@@ -1579,6 +1580,7 @@ class IntermediateToMIPS:
             ".data\n"
             + "\n".join(self.data_section)
             + "\n.text\n"
+            + ".globl main\n"  # Añadir esta línea
             + "\n".join(self.output_code)
         )
         return final_code
