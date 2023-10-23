@@ -1433,6 +1433,7 @@ class IntermediateToMIPS:
         self.stack_pointer_init_val = (
             10000  # Un valor arbitrario para el inicio de la pila.
         )
+        self.strings = {}
 
     def add_string_to_data(self, string):
         string_label = f"str{self.strings_counter}"
@@ -1441,21 +1442,46 @@ class IntermediateToMIPS:
         return string_label
 
     def detect_variables(self, intermediate_code):
+        # Lista negra de términos que no deben ser tratados como variables
+        blacklist = [
+            "begin_class", "Main", "begin_method", "main", "=",
+            "if_false", "goto", "label", "*", "/", "+", "return",
+            "end_method", "end_class"
+        ]
+
         lines = intermediate_code.strip().split("\n")
-        for line in lines:
+        for i, line in enumerate(lines):
             tokens = line.split()
-            if len(tokens) >= 3:
-                var_name = tokens[3]
-                # Asegurarse de que no se trate de un registro temporal o una etiqueta de control de flujo
-                if (
-                    var_name not in self.variables
-                    and not var_name.startswith("$")
-                    and not var_name.startswith("L")
-                    and var_name != "None"
-                    and var_name != "-"  # Añadir esta condición para filtrar la variable inválida
+            for token in tokens:
+                # Primero manejamos la detección de strings
+                if token.startswith('"') and token.endswith('"'):
+                    # Si el token es una cadena y no ha sido detectado previamente
+                    if token not in self.strings:
+                        label = f"str{len(self.strings) + 1}"  # Generar etiqueta única
+                        self.strings[token] = f"{label}: .asciiz {token}"
+                    # Reemplazar el token en el código intermedio con la etiqueta generada
+                    idx = line.index(token)
+                    line = line[:idx] + self.strings[token].split(":")[0] + line[idx + len(token):]
+                    lines[i] = line
+                # Luego manejamos la detección de variables
+                elif (
+                    token not in self.variables
+                    and token not in blacklist
+                    and not token.startswith("$")
+                    and not token.startswith("L")
+                    and not token.isdigit()
+                    and token != "None"
+                    and token != "-"
+                    and not token.startswith('"')
                 ):
-                    self.variables[var_name] = f"{var_name}: .word 0"
+                    self.variables[token] = f"{token}: .word 0"
+        
+        # Extender la sección de datos con las variables detectadas y los strings detectados
         self.data_section.extend(self.variables.values())
+        self.data_section.extend(self.strings.values())
+
+
+
 
     def push_to_stack(self, register):  
         self.output_code.append(f"    subu $sp, $sp, 4")
@@ -1509,25 +1535,23 @@ class IntermediateToMIPS:
                 continue
 
             elif cmd in ["+", "-", "*", "/"]:  # Operaciones aritméticas
-                self.output_code.append(f"    lw $t0, {tokens[1]}")
-                self.output_code.append(f"    lw $t1, {tokens[2]}")
+                for idx, operand in enumerate([tokens[1], tokens[2]]):
+                    if operand.isdigit():
+                        self.output_code.append(f"    li $t{idx}, {operand}")
+                    else:
+                        self.output_code.append(f"    lw $t{idx}, {operand}")
                 operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cmd]
-                self.output_code.append(
-                    f"    {operation} $t2, $t0, $t1"
-                )  # Resultado en $t2
+                self.output_code.append(f"    {operation} $t2, $t0, $t1")  # Resultado en $t2
                 if tokens[3].startswith("$"):
-                    self.output_code.append(
-                        f"    move {tokens[3]}, $t2"
-                    )  # Mover resultado si es registro
+                    self.output_code.append(f"    move {tokens[3]}, $t2")  # Mover resultado si es registro
                 else:
-                    self.output_code.append(
-                        f"    sw $t2, {tokens[3]}"
-                    )  # Guardar resultado si es variable
+                    self.output_code.append(f"    sw $t2, {tokens[3]}")  # Guardar resultado si es variable
                 continue
+
 
             elif cmd == "=":  # Asignación
                 if tokens[1].startswith('"'):  # Asignación de cadena
-                    string_label = self.add_string_to_data(tokens[1].strip('"'))
+                    string_label = self.strings[tokens[1]].split(":")[0]  # Recuperamos la etiqueta previamente generada
                     self.output_code.append(f"    la $t0, {string_label}")
                     self.output_code.append(f"    sw $t0, {tokens[3]}")
                 else:  # Asignación de variable o registro
@@ -1570,9 +1594,13 @@ class IntermediateToMIPS:
             elif cmd == "end_method":
                 if current_function != "main":
                     self.pop_from_stack("$ra")
-                self.output_code.append("    jr $ra")
+                    self.output_code.append("    jr $ra")
+                else:
+                    # Solo para la función main, agregamos el 'jr $ra'
+                    self.output_code.append("    jr $ra")
                 current_function = None
                 continue
+
 
             # ... [Agregar aquí más lógica para otros comandos si es necesario] ...
 

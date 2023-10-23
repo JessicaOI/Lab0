@@ -1,41 +1,33 @@
 .data
-var3: .word 0
+var1: .word 0
 var2: .word 0
-str0: .asciiz "intento"
+str1: .asciiz "Hola"
 .text
 .globl main
-sum:
-    subu $sp, $sp, 4
-    sw $ra, 0($sp)
-    lw $t0, b
-    lw $t1, c
-    mul $t2, $t0, $t1
-    move $t1, $t2
-    lw $t0, a
-    lw $t1, $t1
-    add $t2, $t0, $t1
-    move $t2, $t2
-    lw $v0, $t2
-    jr $ra
-    lw $ra, 0($sp)
-    addu $sp, $sp, 4
-    jr $ra
 main:
     lw $t0, var1
     sw $t0, $t1
     lw $t0, $t1
     beqz $t0, L1
-    li $a0, 5
-    li $a1, 7
-    li $a2, 9
-    jal sum
-    move $t0, $t3
-    sw $t0, var3
+    lw $t0, 10
+    sw $t0, var2
     j L2
 L1:
-    la $t0, str0
+    li $t0, 8
+    li $t1, 9
+    mul $t2, $t0, $t1
+    move $t2, $t2
+    li $t0, 10
+    li $t1, 5
+    div $t2, $t0, $t1
+    move $t3, $t2
+    lw $t0, $t2
+    lw $t1, $t3
+    add $t2, $t0, $t1
+    move $t4, $t2
+    move $t0, $t4
     sw $t0, var2
 L2:
-    lw $v0, var2
+    lw $v0, "Hola"
     jr $ra
     jr $ra
