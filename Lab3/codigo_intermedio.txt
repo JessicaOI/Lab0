@@ -5,10 +5,10 @@ if_false $t1 None L1
 = 10 None var2
 goto None None L2
 label None None L1
-+ 8 9 $t2
-+ $t2 10 $t3
-+ $t3 90 $t2
-= $t2 None var2
+* 9 10 $t2
+/ $t2 90 $t3
++ 8 $t3 $t4
+= $t4 None var2
 label None None L2
 return "Hola" None None
 end_method main - -

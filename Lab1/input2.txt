@@ -6,11 +6,14 @@ class Main {
         if var1 then
             var2 <- 10;
         else
-            var2 <- 8+9+10+90;
+            var2 <- 8+9*10/90;
         fi;
         return "Hola";
     };
 };
+
+
+
 
 
 

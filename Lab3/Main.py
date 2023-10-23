@@ -1138,22 +1138,26 @@ class GeneradorCodigoIntermedio(YAPLListener):
     # Método para obtener una nueva variable temporal
     def new_temp(self):
         if self.available_temporaries:
-            return self.available_temporaries.pop()
+            temp = self.available_temporaries.pop(0)
+            self.processed_temporaries.add(temp)
+            return temp
         else:
             self.temp_counter += 1
-            return f"$t{self.temp_counter}"
+            temp = f"$t{self.temp_counter}"
+            self.processed_temporaries.add(temp)
+            return temp
 
-    # Método para liberar una variable temporal después de su uso
     def release_temp(self, temporary):
-        if temporary.startswith("$t"):
-            if temporary not in self.processed_temporaries:
+        if temporary.startswith("$t") and temporary in self.processed_temporaries:
+            # Verificamos si la temporal está en uso antes de liberarla
+            if not self.is_temporary_in_use(temporary):
+                self.processed_temporaries.remove(temporary)
                 self.available_temporaries.append(temporary)
-            else:
-                print(f"Skipping release of {temporary} - still in use.")
 
-    def is_temporary_in_use_elsewhere(self, temp):
+    def is_temporary_in_use(self, temp):
+        # Verificamos si la temporal se utiliza en cuádruplos pendientes
         for quad in self.cuadruplos:
-            if temp in (quad.arg1, quad.arg2):
+            if temp == quad.arg1 or temp == quad.arg2:
                 return True
         return False
 
@@ -1238,26 +1242,12 @@ class GeneradorCodigoIntermedio(YAPLListener):
         calling_function_name = inspect.stack()[1].function
         # print(f"In {calling_function_name}: Adding quadruple -> {cuadruplo}")
 
-        # Si los cuádruplos están vacíos, simplemente añade el cuadruplo.
         if not self.cuadruplos:
             self.cuadruplos.append(cuadruplo)
-            return
-
-        # Verifica si el cuadruplo actual y el último añadido son asignaciones a la misma variable.
-        last_cuadruplo = self.cuadruplos[-1]
-        if (
-            cuadruplo.operador == "="
-            and last_cuadruplo.operador == "="
-            and cuadruplo.destino == last_cuadruplo.destino
-        ):
-            # Si es así, reemplace el último cuadruplo con el nuevo.
-            self.cuadruplos[-1] = cuadruplo
-            # print(f"Replacing cuadruplo: {last_cuadruplo} -> {cuadruplo}")
         elif all(c != cuadruplo for c in self.cuadruplos):
-            # Si el cuadruplo no está en la lista en absoluto, añádelo.
             self.cuadruplos.append(cuadruplo)
         else:
-            print(f"Skipping cuadruplo: {cuadruplo} - already exists.")
+            print(f"Skipping quadruple: {cuadruplo} - already exists.")
 
     def process_statement_block(self, block_statement):
         for expression_statement in block_statement.getTypedRuleContexts(
@@ -1291,7 +1281,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
             if first_child == "if":
                 self.inside_block = True
                 temp = self.new_temp()
-                if self.is_temporary_in_use_elsewhere(temp):
+                if self.is_temporary_in_use(temp):
                     self.processed_temporaries.add(temp)
                 condition = self.process_expression(ctx.expression())
                 self.add_cuadruplo(Cuadruplo("=", condition, None, temp))
@@ -1316,7 +1306,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 self.add_cuadruplo(Cuadruplo("label", None, None, label_start))
 
                 temp = self.new_temp()
-                if self.is_temporary_in_use_elsewhere(temp):
+                if self.is_temporary_in_use(temp):
                     self.processed_temporaries.add(temp)
                 condition = self.process_expression(ctx.expression())
                 self.add_cuadruplo(Cuadruplo("=", condition, None, temp))
@@ -1366,7 +1356,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
             operator = ctx.getChild(0).getText()
             operand = self.process_expression(ctx.expression(0))
             temp = self.new_temp()
-            if self.is_temporary_in_use_elsewhere(temp):
+            if self.is_temporary_in_use(temp):
                 self.processed_temporaries.add(temp)
             if operator == "-":
                 self.add_cuadruplo(Cuadruplo("menos", operand, None, temp))
@@ -1378,7 +1368,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
         elif ctx.LPAREN():
             function_name = ctx.OBJECT_ID().getText()
             temp = self.new_temp()
-            if self.is_temporary_in_use_elsewhere(temp):
+            if self.is_temporary_in_use(temp):
                 self.processed_temporaries.add(temp)
             arguments = [self.process_expression(expr) for expr in ctx.expression()]
 
@@ -1399,7 +1389,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
             right_expr = self.process_expression(ctx.expression(1))
             operator = ctx.getChild(1).getText()
             temp = self.new_temp()
-            if self.is_temporary_in_use_elsewhere(temp):
+            if self.is_temporary_in_use(temp):
                 self.processed_temporaries.add(temp)
             self.add_cuadruplo(Cuadruplo(operator, left_expr, right_expr, temp))
             # Importante: liberar las temporales después de usarlas
@@ -1520,7 +1510,6 @@ class IntermediateToMIPS:
         self.detect_variables(intermediate_code)
         lines = intermediate_code.strip().split("\n")
         current_function = None
-        params = []
 
         for line in lines:
             tokens = line.split()
@@ -1529,69 +1518,49 @@ class IntermediateToMIPS:
 
             cmd = tokens[0]
 
-            if cmd == "param":
-                params.append(tokens[1])
-                continue
+            if cmd in ["+", "-", "*", "/"]:
+                reg1, reg2, result_reg = "$t0", "$t1", "$t2"
 
-            elif cmd == "invoke_function":
-                function_name = tokens[1]
-                for i, param in enumerate(params):
-                    if (
-                        param.isdigit()
-                    ):  # Si el parámetro es un número, lo cargamos directamente
-                        self.output_code.append(f"    li $a{i}, {param}")
-                    else:  # Si es una variable, cargamos la dirección
-                        self.output_code.append(f"    la $a{i}, {param}")
-                self.output_code.append(f"    jal {function_name}")
-                params = []
-                continue
-
-            elif cmd in ["+", "-", "*", "/"]:  # Operaciones aritméticas
-                for idx, operand in enumerate([tokens[1], tokens[2]]):
-                    if operand.isdigit():
-                        self.output_code.append(f"    li $t{idx}, {operand}")
-                    else:
-                        self.output_code.append(f"    lw $t{idx}, {operand}")
-                operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cmd]
-                self.output_code.append(
-                    f"    {operation} $t2, $t0, $t1"
-                )  # Resultado en $t2
-                if cmd == "/":
-                    self.output_code.append(
-                        "    mflo $t2"
-                    )  # El resultado de la división está en $lo
-                if tokens[3].startswith("$"):
-                    self.output_code.append(
-                        f"    move {tokens[3]}, $t2"
-                    )  # Mover resultado si es registro
+                if tokens[1].isdigit() or tokens[1].startswith("$"):
+                    self.output_code.append(f"    li {reg1}, {tokens[1]}")
                 else:
+                    self.output_code.append(f"    lw {reg1}, {tokens[1]}")
+
+                if tokens[2].isdigit() or tokens[2].startswith("$"):
+                    self.output_code.append(f"    li {reg2}, {tokens[2]}")
+                else:
+                    self.output_code.append(f"    lw {reg2}, {tokens[2]}")
+
+                operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cmd]
+                if cmd != "/":
                     self.output_code.append(
-                        f"    sw $t2, {tokens[3]}"
-                    )  # Guardar resultado si es variable
+                        f"    {operation} {result_reg}, {reg1}, {reg2}"
+                    )
+                else:
+                    self.output_code.append(f"    {operation} {reg1}, {reg2}")
+                    self.output_code.append(f"    mflo {result_reg}")
+
+                if len(tokens) > 3 and not tokens[3].startswith("$"):
+                    self.output_code.append(f"    sw {result_reg}, {tokens[3]}")
                 continue
 
-            elif cmd == "=":  # Asignación
-                if tokens[1].startswith('"'):  # Asignación de cadena
-                    string_label = tokens[1]
-                    if string_label in self.strings:
-                        # Recuperamos la etiqueta previamente generada
-                        string_label = self.strings[string_label].split(":")[0]
-                    self.output_code.append(f"    la $t0, {string_label}")
-                    self.output_code.append(f"    sw $t0, {tokens[3]}")
-                else:  # Asignación de variable o registro
-                    src = tokens[1]
-                    if src.isdigit():
-                        self.output_code.append(f"    li $t0, {src}")
-                    elif src.startswith("$"):
-                        self.output_code.append(f"    move $t0, {src}")
-                    else:
-                        self.output_code.append(f"    lw $t0, {src}")
-                    self.output_code.append(f"    sw $t0, {tokens[3]}")
+            elif cmd == "=":
+                source, target = tokens[1], tokens[3]
+                if source.isdigit():
+                    self.output_code.append(f"    li $t0, {source}")
+                elif source.startswith("$"):
+                    self.output_code.append(f"    move $t0, {source}")
+                else:
+                    self.output_code.append(f"    lw $t0, {source}")
+
+                if target.startswith("$"):
+                    self.output_code.append(f"    move {target}, $t0")
+                else:
+                    self.output_code.append(f"    sw $t0, {target}")
                 continue
 
             elif cmd == "if_false":
-                self.output_code.append(f"    lw $t0, {tokens[1]}")
-                self.output_code.append(f"    beqz $t0, {tokens[3]}")
+                self.output_code.append(f"    beqz {tokens[1]}, {tokens[3]}")
                 continue
 
             elif cmd == "goto":
@@ -1605,11 +1574,10 @@ class IntermediateToMIPS:
             elif cmd == "return":
                 if tokens[1] != "None":
                     if tokens[1].startswith('"'):
-                        # Asumiendo que estamos retornando una referencia a una cadena
                         string_label = self.strings[tokens[1]].split(":")[0]
                         self.output_code.append(f"    la $v0, {string_label}")
                     else:
-                        self.output_code.append(f"    lw $v0, {tokens[1]}")
+                        self.output_code.append(f"    move $v0, {tokens[1]}")
                 self.output_code.append("    jr $ra")
                 continue
 
@@ -1623,20 +1591,17 @@ class IntermediateToMIPS:
             elif cmd == "end_method":
                 if current_function != "main":
                     self.pop_from_stack("$ra")
-                    self.output_code.append("    jr $ra")
                 else:
-                    # Solo para la función main, agregamos el 'jr $ra'
-                    self.output_code.append("    jr $ra")
+                    self.output_code.append("    li $v0, 10")
+                    self.output_code.append("    syscall")
                 current_function = None
                 continue
-
-            # ... [Agregar aquí más lógica para otros comandos si es necesario] ...
 
         final_code = (
             ".data\n"
             + "\n".join(self.data_section)
             + "\n.text\n"
-            + ".globl main\n"  # Añadir esta línea
+            + ".globl main\n"
             + "\n".join(self.output_code)
         )
         return final_code
