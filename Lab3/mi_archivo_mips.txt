@@ -9,25 +9,25 @@ main:
     sw $t0, $t1
     lw $t0, $t1
     beqz $t0, L1
-    lw $t0, 10
+    li $t0, 10
     sw $t0, var2
     j L2
 L1:
     li $t0, 8
     li $t1, 9
-    mul $t2, $t0, $t1
-    move $t2, $t2
-    li $t0, 10
-    li $t1, 5
-    div $t2, $t0, $t1
-    move $t3, $t2
-    lw $t0, $t2
-    lw $t1, $t3
     add $t2, $t0, $t1
-    move $t4, $t2
-    move $t0, $t4
+    move $t2, $t2
+    lw $t0, $t2
+    li $t1, 10
+    add $t2, $t0, $t1
+    move $t3, $t2
+    lw $t0, $t3
+    li $t1, 90
+    add $t2, $t0, $t1
+    move $t2, $t2
+    move $t0, $t2
     sw $t0, var2
 L2:
-    lw $v0, "Hola"
+    la $v0, str1
     jr $ra
     jr $ra

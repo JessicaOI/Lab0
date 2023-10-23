@@ -1444,9 +1444,20 @@ class IntermediateToMIPS:
     def detect_variables(self, intermediate_code):
         # Lista negra de términos que no deben ser tratados como variables
         blacklist = [
-            "begin_class", "Main", "begin_method", "main", "=",
-            "if_false", "goto", "label", "*", "/", "+", "return",
-            "end_method", "end_class"
+            "begin_class",
+            "Main",
+            "begin_method",
+            "main",
+            "=",
+            "if_false",
+            "goto",
+            "label",
+            "*",
+            "/",
+            "+",
+            "return",
+            "end_method",
+            "end_class",
         ]
 
         lines = intermediate_code.strip().split("\n")
@@ -1461,7 +1472,11 @@ class IntermediateToMIPS:
                         self.strings[token] = f"{label}: .asciiz {token}"
                     # Reemplazar el token en el código intermedio con la etiqueta generada
                     idx = line.index(token)
-                    line = line[:idx] + self.strings[token].split(":")[0] + line[idx + len(token):]
+                    line = (
+                        line[:idx]
+                        + self.strings[token].split(":")[0]
+                        + line[idx + len(token) :]
+                    )
                     lines[i] = line
                 # Luego manejamos la detección de variables
                 elif (
@@ -1475,15 +1490,12 @@ class IntermediateToMIPS:
                     and not token.startswith('"')
                 ):
                     self.variables[token] = f"{token}: .word 0"
-        
+
         # Extender la sección de datos con las variables detectadas y los strings detectados
         self.data_section.extend(self.variables.values())
         self.data_section.extend(self.strings.values())
 
-
-
-
-    def push_to_stack(self, register):  
+    def push_to_stack(self, register):
         self.output_code.append(f"    subu $sp, $sp, 4")
         self.output_code.append(f"    sw {register}, 0($sp)")
 
@@ -1541,22 +1553,36 @@ class IntermediateToMIPS:
                     else:
                         self.output_code.append(f"    lw $t{idx}, {operand}")
                 operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cmd]
-                self.output_code.append(f"    {operation} $t2, $t0, $t1")  # Resultado en $t2
+                self.output_code.append(
+                    f"    {operation} $t2, $t0, $t1"
+                )  # Resultado en $t2
+                if cmd == "/":
+                    self.output_code.append(
+                        "    mflo $t2"
+                    )  # El resultado de la división está en $lo
                 if tokens[3].startswith("$"):
-                    self.output_code.append(f"    move {tokens[3]}, $t2")  # Mover resultado si es registro
+                    self.output_code.append(
+                        f"    move {tokens[3]}, $t2"
+                    )  # Mover resultado si es registro
                 else:
-                    self.output_code.append(f"    sw $t2, {tokens[3]}")  # Guardar resultado si es variable
+                    self.output_code.append(
+                        f"    sw $t2, {tokens[3]}"
+                    )  # Guardar resultado si es variable
                 continue
-
 
             elif cmd == "=":  # Asignación
                 if tokens[1].startswith('"'):  # Asignación de cadena
-                    string_label = self.strings[tokens[1]].split(":")[0]  # Recuperamos la etiqueta previamente generada
+                    string_label = tokens[1]
+                    if string_label in self.strings:
+                        # Recuperamos la etiqueta previamente generada
+                        string_label = self.strings[string_label].split(":")[0]
                     self.output_code.append(f"    la $t0, {string_label}")
                     self.output_code.append(f"    sw $t0, {tokens[3]}")
                 else:  # Asignación de variable o registro
                     src = tokens[1]
-                    if src.startswith("$"):
+                    if src.isdigit():
+                        self.output_code.append(f"    li $t0, {src}")
+                    elif src.startswith("$"):
                         self.output_code.append(f"    move $t0, {src}")
                     else:
                         self.output_code.append(f"    lw $t0, {src}")
@@ -1578,9 +1604,12 @@ class IntermediateToMIPS:
 
             elif cmd == "return":
                 if tokens[1] != "None":
-                    self.output_code.append(
-                        f"    lw $v0, {tokens[1]}"
-                    )  # Cargar valor de retorno
+                    if tokens[1].startswith('"'):
+                        # Asumiendo que estamos retornando una referencia a una cadena
+                        string_label = self.strings[tokens[1]].split(":")[0]
+                        self.output_code.append(f"    la $v0, {string_label}")
+                    else:
+                        self.output_code.append(f"    lw $v0, {tokens[1]}")
                 self.output_code.append("    jr $ra")
                 continue
 
@@ -1600,7 +1629,6 @@ class IntermediateToMIPS:
                     self.output_code.append("    jr $ra")
                 current_function = None
                 continue
-
 
             # ... [Agregar aquí más lógica para otros comandos si es necesario] ...
 

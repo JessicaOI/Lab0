@@ -8,9 +8,10 @@ class Main {
         else
             var2 <- 8+9+10+90;
         fi;
-        return "Este es un String, no un Int";
+        return "Hola";
     };
 };
+
 
 
 
