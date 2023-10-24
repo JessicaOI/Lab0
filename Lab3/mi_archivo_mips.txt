@@ -27,5 +27,4 @@ L1:
 L2:
     la $v0, str1
     jr $ra
-    li $v0, 10
-    syscall
+    jr $ra

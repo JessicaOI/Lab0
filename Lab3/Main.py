@@ -1592,8 +1592,8 @@ class IntermediateToMIPS:
                 if current_function != "main":
                     self.pop_from_stack("$ra")
                 else:
-                    self.output_code.append("    li $v0, 10")
-                    self.output_code.append("    syscall")
+                    # Solo para la función main, agregamos el 'jr $ra'
+                    self.output_code.append("    jr $ra")
                 current_function = None
                 continue
 
