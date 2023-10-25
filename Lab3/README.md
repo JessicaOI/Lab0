@@ -1,16 +1,12 @@
-# Lab0
+# Lab3
 
-## Comandos
+### Para ejecutarlo(tener instalado antlr4)
+'''
+cd Lab3
+'''
 
-## Compilar 
+'''
+python Main.py
+'''
 
-java -jar antlr-4.13.0-complete.jar -Dlanguage=Python3 Expr.g4   
-
-## Run Python Program
-
-python main.py input.txt   
-
-## Install en Python
-
-pip install antlr4-python3-runtime
-
+En el "Video Lab3 pt1 y p2.mp4" estan las explicaciones
