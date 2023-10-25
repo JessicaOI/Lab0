@@ -1623,7 +1623,7 @@ class IntermediateToMIPS:
                         self.output_code.append(f"    la $v0, {string_label}")
                     else:
                         self.output_code.append(f"    move $v0, {tokens[1]}")
-                self.output_code.append("    jr $ra")
+                # self.output_code.append("    jr $ra")
                 continue
 
             elif cmd == "begin_method":

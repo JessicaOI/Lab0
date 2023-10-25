@@ -24,4 +24,3 @@ L1:
 L2:
     la $v0, str1
     jr $ra
-    jr $ra
