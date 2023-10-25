@@ -6,7 +6,7 @@ str1: .asciiz "Hola"
 .globl main
 main:
     lw $t0, var1
-    move $t1, $t0
+    sw $t0, $t1
     beqz $t1, L1
     li $t0, 10
     sw $t0, var2
@@ -15,15 +15,12 @@ L1:
     li $t0, 9
     li $t1, 10
     mul $t2, $t0, $t1
-    li $t0, $t2
-    li $t1, 90
-    div $t0, $t1
-    mflo $t2
+    li $t0, 90
+    div $t2, $t0
+    mflo $t3
     li $t0, 8
-    li $t1, $t3
-    add $t2, $t0, $t1
-    move $t0, $t4
-    sw $t0, var2
+    add $t4, $t0, $t3
+    sw $t4, var2
 L2:
     la $v0, str1
     jr $ra

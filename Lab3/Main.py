@@ -1413,6 +1413,25 @@ class GeneradorCodigoIntermedio(YAPLListener):
 # -------------------------Fin Generador codigo intermedio---------------------------------------------
 
 # -------------------------Traductor a lenguaje ensamblador MIPS---------------------------------------------
+
+
+class RegisterManager:
+    def __init__(self):
+        self.registers = ["$t" + str(i) for i in range(10)]
+        self.in_use = set()
+
+    def get_register(self):
+        for reg in self.registers:
+            if reg not in self.in_use:
+                self.in_use.add(reg)
+                return reg
+        raise Exception("All temporary registers in use!")
+
+    def release_register(self, reg):
+        if reg in self.in_use:
+            self.in_use.remove(reg)
+
+
 class IntermediateToMIPS:
     def __init__(self):
         self.output_code = []
@@ -1424,6 +1443,7 @@ class IntermediateToMIPS:
             10000  # Un valor arbitrario para el inicio de la pila.
         )
         self.strings = {}
+        self.register_manager = RegisterManager()
 
     def add_string_to_data(self, string):
         string_label = f"str{self.strings_counter}"
@@ -1519,45 +1539,70 @@ class IntermediateToMIPS:
             cmd = tokens[0]
 
             if cmd in ["+", "-", "*", "/"]:
-                reg1, reg2, result_reg = "$t0", "$t1", "$t2"
+                reg1 = (
+                    tokens[1]
+                    if tokens[1].startswith("$t")
+                    else self.register_manager.get_register()
+                )
+                reg2 = (
+                    tokens[2]
+                    if tokens[2].startswith("$t")
+                    else self.register_manager.get_register()
+                )
+                result_reg = (
+                    tokens[3]
+                    if tokens[3].startswith("$t")
+                    else self.register_manager.get_register()
+                )
 
-                if tokens[1].isdigit() or tokens[1].startswith("$"):
-                    self.output_code.append(f"    li {reg1}, {tokens[1]}")
-                else:
-                    self.output_code.append(f"    lw {reg1}, {tokens[1]}")
-
-                if tokens[2].isdigit() or tokens[2].startswith("$"):
-                    self.output_code.append(f"    li {reg2}, {tokens[2]}")
-                else:
-                    self.output_code.append(f"    lw {reg2}, {tokens[2]}")
+                if tokens[1] != reg1:
+                    if tokens[1].isdigit() or tokens[1].startswith("$"):
+                        self.output_code.append(f"    li {reg1}, {tokens[1]}")
+                    else:
+                        self.output_code.append(f"    lw {reg1}, {tokens[1]}")
+                if tokens[2] != reg2:
+                    if tokens[2].isdigit() or tokens[2].startswith("$"):
+                        self.output_code.append(f"    li {reg2}, {tokens[2]}")
+                    else:
+                        self.output_code.append(f"    lw {reg2}, {tokens[2]}")
 
                 operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cmd]
-                if cmd != "/":
+                if cmd == "/":
+                    self.output_code.append(f"    {operation} {reg1}, {reg2}")
+                    self.output_code.append(f"    mflo {result_reg}")
+                else:
                     self.output_code.append(
                         f"    {operation} {result_reg}, {reg1}, {reg2}"
                     )
-                else:
-                    self.output_code.append(f"    {operation} {reg1}, {reg2}")
-                    self.output_code.append(f"    mflo {result_reg}")
 
-                if len(tokens) > 3 and not tokens[3].startswith("$"):
+                # Solamente almacenar el resultado si es necesario
+                if tokens[3] != result_reg:
                     self.output_code.append(f"    sw {result_reg}, {tokens[3]}")
-                continue
+
+                # Liberar registros después de usar su contenido
+                if not tokens[1].startswith("$t"):
+                    self.register_manager.release_register(reg1)
+                if not tokens[2].startswith("$t"):
+                    self.register_manager.release_register(reg2)
+                self.register_manager.release_register(result_reg)
 
             elif cmd == "=":
-                source, target = tokens[1], tokens[3]
-                if source.isdigit():
-                    self.output_code.append(f"    li $t0, {source}")
-                elif source.startswith("$"):
-                    self.output_code.append(f"    move $t0, {source}")
-                else:
-                    self.output_code.append(f"    lw $t0, {source}")
+                source_reg = (
+                    tokens[1]
+                    if tokens[1].startswith("$t")
+                    else self.register_manager.get_register()
+                )
 
-                if target.startswith("$"):
-                    self.output_code.append(f"    move {target}, $t0")
-                else:
-                    self.output_code.append(f"    sw $t0, {target}")
-                continue
+                if not tokens[1].startswith("$t"):
+                    if tokens[1].isdigit():
+                        self.output_code.append(f"    li {source_reg}, {tokens[1]}")
+                    else:
+                        self.output_code.append(f"    lw {source_reg}, {tokens[1]}")
+
+                self.output_code.append(f"    sw {source_reg}, {tokens[3]}")
+
+                if not tokens[1].startswith("$t"):
+                    self.register_manager.release_register(source_reg)
 
             elif cmd == "if_false":
                 self.output_code.append(f"    beqz {tokens[1]}, {tokens[3]}")
