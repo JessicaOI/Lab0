@@ -1446,64 +1446,42 @@ class IntermediateToMIPS:
         self.register_manager = RegisterManager()
 
     def add_string_to_data(self, string):
+        # Esta función maneja la adición de cadenas a la sección .data
         string_label = f"str{self.strings_counter}"
         self.strings_counter += 1
         self.data_section.append(f'{string_label}: .asciiz "{string}"')
         return string_label
 
+    def is_valid_variable_name(self, token):
+        # Verifica si un token es un nombre de variable válido
+        if token.startswith("$") or token.isdigit() or token.startswith('"'):
+            return False  # No es una variable si es un registro, número o cadena
+        if any(char in token for char in "+-*/:()"):
+            return False  # No es una variable si contiene operadores o dos puntos
+        if token in ["None", "main", "label", "goto", "if_false", "return", "param", "invoke_function"]:
+            return False  # Palabras clave específicas que no son variables
+        if token.startswith("L") and token[1:].isdigit():
+            return False  # Excluir etiquetas como L1, L2, etc.
+        if token.endswith("_class") or token.endswith("_method"):
+            return False  # Excluir nombres de clases y métodos
+        return True  # Si no se cumple ninguna de las condiciones anteriores, es una variable
+
     def detect_variables(self, intermediate_code):
-        # Lista negra de términos que no deben ser tratados como variables
-        blacklist = [
-            "begin_class",
-            "Main",
-            "begin_method",
-            "main",
-            "=",
-            "if_false",
-            "goto",
-            "label",
-            "*",
-            "/",
-            "+",
-            "return",
-            "end_method",
-            "end_class",
-        ]
+        # Esta función detecta las variables y las agrega a la sección .data
+        variables_to_declare = set()
 
         lines = intermediate_code.strip().split("\n")
-        for i, line in enumerate(lines):
+        for line in lines:
             tokens = line.split()
-            for token in tokens:
-                # Primero manejamos la detección de strings
-                if token.startswith('"') and token.endswith('"'):
-                    # Si el token es una cadena y no ha sido detectado previamente
-                    if token not in self.strings:
-                        label = f"str{len(self.strings) + 1}"  # Generar etiqueta única
-                        self.strings[token] = f"{label}: .asciiz {token}"
-                    # Reemplazar el token en el código intermedio con la etiqueta generada
-                    idx = line.index(token)
-                    line = (
-                        line[:idx]
-                        + self.strings[token].split(":")[0]
-                        + line[idx + len(token) :]
-                    )
-                    lines[i] = line
-                # Luego manejamos la detección de variables
-                elif (
-                    token not in self.variables
-                    and token not in blacklist
-                    and not token.startswith("$")
-                    and not token.startswith("L")
-                    and not token.isdigit()
-                    and token != "None"
-                    and token != "-"
-                    and not token.startswith('"')
-                ):
-                    self.variables[token] = f"{token}: .word 0"
 
-        # Extender la sección de datos con las variables detectadas y los strings detectados
-        self.data_section.extend(self.variables.values())
-        self.data_section.extend(self.strings.values())
+            for token in tokens:
+                # Solo considera tokens que son nombres de variables válidos
+                if self.is_valid_variable_name(token):
+                    variables_to_declare.add(token)
+
+        # Agregar las variables a la sección de datos
+        self.data_section = [f"{variable}: .word 0" for variable in sorted(variables_to_declare)]
+
 
     def push_to_stack(self, register):
         self.output_code.append(f"    subu $sp, $sp, 4")
@@ -1514,17 +1492,24 @@ class IntermediateToMIPS:
         self.output_code.append(f"    addu $sp, $sp, 4")
 
     def handle_params(self, param_list):
-        # Suponiendo que los parámetros se pasan mediante los registros $a0-$a3
+        # Asumimos que los parámetros se pasan mediante los registros $a0-$a3
         # y que no hay más de 4 parámetros
         for i, param in enumerate(param_list):
             register = f"$a{i}"
+            if param == "None":
+                # Si el parámetro es None, no generamos ninguna instrucción.
+                continue
             if param.startswith('"'):
                 # Es una cadena, así que hay que añadirla a la sección de datos
                 string_label = self.add_string_to_data(param.strip('"'))
                 self.output_code.append(f"    la {register}, {string_label}")
+            elif param.isdigit():
+                # Para valores inmediatos, usamos la instrucción 'li'
+                self.output_code.append(f"    li {register}, {param}")
             else:
-                # Para otros tipos, simplemente cargamos el valor en el registro correspondiente
+                # Para otros tipos, cargamos el valor desde la dirección de memoria en el registro correspondiente
                 self.output_code.append(f"    lw {register}, {param}")
+
 
     def generate_code(self, intermediate_code):
         self.detect_variables(intermediate_code)
@@ -1605,42 +1590,50 @@ class IntermediateToMIPS:
                     self.register_manager.release_register(source_reg)
 
             elif cmd == "if_false":
+                self.output_code.append(f"    lw {tokens[1]}, {tokens[1]}")
                 self.output_code.append(f"    beqz {tokens[1]}, {tokens[3]}")
-                continue
 
             elif cmd == "goto":
                 self.output_code.append(f"    j {tokens[3]}")
-                continue
 
             elif cmd == "label":
+                self.labels.add(tokens[3])
                 self.output_code.append(f"{tokens[3]}:")
-                continue
 
             elif cmd == "return":
-                if tokens[1] != "None":
-                    if tokens[1].startswith('"'):
-                        string_label = self.strings[tokens[1]].split(":")[0]
-                        self.output_code.append(f"    la $v0, {string_label}")
-                    else:
-                        self.output_code.append(f"    move $v0, {tokens[1]}")
-                # self.output_code.append("    jr $ra")
-                continue
+                if tokens[1].startswith('"'):
+                    string_label = self.add_string_to_data(tokens[1].strip('"'))
+                    self.output_code.append(f"    la $v0, {string_label}")
+                elif tokens[1] != "None":
+                    self.output_code.append(f"    lw $v0, {tokens[1]}")  # Load the variable into $v0
+                self.output_code.append("    jr $ra")
 
             elif cmd == "begin_method":
                 current_function = tokens[1]
                 self.output_code.append(f"{current_function}:")
-                if current_function != "main":
-                    self.push_to_stack("$ra")
-                continue
+                if current_function == "main":
+                    self.output_code.append("    move $sp, $fp")  # Set up stack pointer for main
 
             elif cmd == "end_method":
                 if current_function != "main":
-                    self.pop_from_stack("$ra")
-                else:
-                    # Solo para la función main, agregamos el 'jr $ra'
-                    self.output_code.append("    jr $ra")
+                    self.output_code.append("    move $fp, $sp")  # Reset frame pointer for non-main methods
+                self.output_code.append("    jr $ra")
                 current_function = None
-                continue
+
+            elif cmd == "param":
+                # Aquí asumimos que todos los parámetros se pasan en una sola línea
+                # Si tu código intermedio tiene un 'param' por línea, tendrás que ajustar esto
+                param_list = tokens[1:]  # Obtiene todos los parámetros de la línea
+                self.handle_params(param_list)
+
+
+
+            elif cmd == "invoke_function":
+                function_name = tokens[1]
+                result_reg = tokens[3]
+                self.output_code.append(f"    jal {function_name}")
+                if result_reg != "None":
+                    self.output_code.append(f"    move {result_reg}, $v0")
 
         final_code = (
             ".data\n"

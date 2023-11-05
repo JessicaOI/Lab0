@@ -1,26 +1,42 @@
 .data
+=: .word 0
+Main: .word 0
+a: .word 0
+b: .word 0
+c: .word 0
+sum: .word 0
 var1: .word 0
 var2: .word 0
-str1: .asciiz "Hola"
+var3: .word 0
 .text
 .globl main
+sum:
+    lw $t0, b
+    lw $t1, c
+    mul $t1, $t0, $t1
+    lw $t0, a
+    add $t2, $t0, $t1
+    lw $v0, $t2
+    jr $ra
+    move $fp, $sp
+    jr $ra
 main:
+    move $sp, $fp
     lw $t0, var1
-    sw $t0, $t1
-    beqz $t1, L1
-    li $t0, 10
-    sw $t0, var2
+    sw $t0, $t3
+    lw $t3, $t3
+    beqz $t3, L1
+    li $a0, 5
+    li $a0, 7
+    li $a0, 9
+    jal sum
+    move $t4, $v0
+    sw $t4, var3
     j L2
 L1:
-    li $t0, 9
-    li $t1, 10
-    mul $t2, $t0, $t1
-    li $t0, 90
-    div $t2, $t0
-    mflo $t3
-    li $t0, 8
-    add $t4, $t0, $t3
-    sw $t4, var2
+    lw $t0, "intento"
+    sw $t0, var2
 L2:
-    la $v0, str1
+    lw $v0, var2
+    jr $ra
     jr $ra
