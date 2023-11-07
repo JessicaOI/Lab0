@@ -3,8 +3,8 @@ class Main {
     var2: String;
     var3: Int;
 
-    sum(a: Int, b: Int, t1: Int): Int {
-        return a + b * t1;
+    sum(a: Int, b: Int, c: Int): Int {
+        return a + b * c;
     };
 
     main(): String {
@@ -16,6 +16,17 @@ class Main {
         return var2;
     };
 };
+
+
+
+
+
+
+
+
+
+
+
 
 
 

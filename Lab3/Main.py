@@ -1714,6 +1714,26 @@ class IntermediateToMIPS:
         self.label_counter += 1
         return label
 
+    def load_to_register(self, operand):
+        """
+        Carga un operando en un registro. Si el operando es una constante,
+        se utiliza 'li'. Si es una variable, se usa 'lw'.
+        """
+        reg = self.register_manager.get_register()
+        if operand.isdigit():  # Si es un valor inmediato
+            self.add_text(f"li {reg}, {operand}")
+        else:  # Si es una variable o temporal
+            self.add_text(f"lw {reg}, {operand}")
+        return reg
+
+    def store_from_register(self, reg, destination):
+        """
+        Almacena el contenido de un registro en una dirección de memoria especificada
+        por 'destination'.
+        """
+        self.add_text(f"sw {reg}, {destination}")
+        self.register_manager.release_register(reg)
+
     def read_intermediate_code(self, filename):
         with open(filename, 'r') as file:
             lines = file.readlines()
@@ -1721,18 +1741,31 @@ class IntermediateToMIPS:
         cuadruplos = []
         for line in lines:
             parts = line.strip().split()
-            if not parts:
-                continue  # Ignorar líneas vacías
-            # Asumimos que los cuádruplos tienen 4 partes. Ajusta según sea necesario.
+            if not parts or parts[0].startswith('#'):  # Ignorar líneas vacías y comentarios
+                continue
+            
+            # Filtrar los tokens que no necesitas (por ejemplo, '-')
+            parts = [p for p in parts if p != '-' and p != '->']
+            
+            if len(parts) > 4:
+                raise ValueError(f"Demasiados argumentos en cuádruplo: {parts}")
+            
+            # Rellenar con None si hay menos de 4 partes
+            while len(parts) < 4:
+                parts.append(None)
+            
             cuad = Cuadruplo(*parts)
             cuadruplos.append(cuad)
         
         return cuadruplos
 
-    def translate(self, intermediate_code):
-        for cuad in intermediate_code:
+
+    def translate(self, cuadruplos):
+        for cuad in cuadruplos:
+            if cuad.operador == "return":
+                self.handle_return(cuad)
             # Determine the type of the cuadruple and handle accordingly
-            if cuad.operador in ["+", "-", "*", "/"]:
+            elif cuad.operador in ["+", "-", "*", "/"]:
                 # Arithmetic operations
                 self.handle_arithmetic(cuad)
             elif cuad.operador == "=":
@@ -1759,7 +1792,36 @@ class IntermediateToMIPS:
             # Add more elifs for other operations like 'begin_class', 'end_class', etc.
 
     def generate_mips(self):
-        return ".data\n" + "\n".join(self.data_section) + "\n.text\n" + "\n".join(self.text_section)
+        # Aseguramos que la sección .data y .text estén formateadas correctamente.
+        data_formatted = ".data\n" + "\n".join(self.data_section) + "\n"
+        text_formatted = ".text\n.globl main\n" + "\n".join(self.text_section)
+        return data_formatted + text_formatted
+
+    def handle_if_false(self, cuad):
+        # Suponiendo que cuad.arg1 es el registro o la variable que contiene el resultado de la condición.
+        # cuad.destino es la etiqueta a la que se debe saltar si la condición es falsa.
+        if cuad.arg1.startswith("$"):  # Si es un registro temporal
+            self.add_text(f"beqz {cuad.arg1}, {cuad.destino}")
+        else:  # Si es una variable, primero la cargamos en un registro temporal.
+            reg = self.load_to_register(cuad.arg1)
+            self.add_text(f"beqz {reg}, {cuad.destino}")
+            self.register_manager.release_register(reg)
+
+    
+    def handle_param(self, cuad):
+        """
+        Maneja las instrucciones de parámetros en el código intermedio.
+        Este método asume que los parámetros se pasan a través de los registros $a0 a $a3.
+        """
+        # Suponiendo que 'cuad.arg1' es el valor del parámetro y 
+        # 'cuad.arg2' es la posición del parámetro (0 para el primer parámetro, 1 para el segundo, etc.)
+        reg = f"$a{cuad.arg2}"
+        if cuad.arg1.isdigit():  # Si el parámetro es una constante numérica
+            self.add_text(f"li {reg}, {cuad.arg1}")
+        elif cuad.arg1.startswith("$"):  # Si el parámetro es un registro temporal
+            self.add_text(f"move {reg}, {cuad.arg1}")
+        else:  # Si el parámetro es una variable
+            self.add_text(f"lw {reg}, {cuad.arg1}")
 
     def handle_arithmetic(self, cuad):
         reg1 = self.load_to_register(cuad.arg1)
@@ -1779,9 +1841,41 @@ class IntermediateToMIPS:
         self.register_manager.release_register(result_reg)
 
     def handle_assignment(self, cuad):
+        # Maneja las asignaciones
         src_reg = self.load_to_register(cuad.arg1)
         self.store_from_register(src_reg, cuad.destino)
-        self.register_manager.release_register(src_reg)
+
+    def handle_goto(self, cuad):
+        # Maneja los saltos incondicionales
+        self.add_text(f"j {cuad.destino}")
+
+    def handle_label(self, cuad):
+        # Define las etiquetas
+        self.add_text(f"{cuad.arg1}:")  # arg1 aquí es el nombre de la etiqueta.
+
+    def handle_return(self, cuad):
+        # Maneja las instrucciones de retorno
+        if cuad.arg1 is not None:
+            if cuad.arg1.isdigit():
+                self.add_text(f"li $v0, {cuad.arg1}")
+            else:
+                loaded_reg = self.load_to_register(cuad.arg1)
+                self.add_text(f"move $v0, {loaded_reg}")
+                self.register_manager.release_register(loaded_reg)
+        self.add_text("jr $ra")
+
+    def handle_function_invocation(self, cuad):
+        # Maneja la invocación de funciones
+        self.add_text(f"jal {cuad.arg1}")
+        if cuad.destino:
+            self.add_text(f"move {self.load_to_register(cuad.destino)}, $v0")
+
+    def handle_syscall(self, syscall_code, register=None, value=None):
+        # Método para manejar syscalls, como imprimir.
+        self.add_text(f"li $v0, {syscall_code}")
+        if register and value:
+            self.add_text(f"li {register}, {value}")
+        self.add_text("syscall")
 
     def load_operand(self, reg, operand):
         if operand.isdigit():

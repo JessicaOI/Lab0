@@ -1,6 +1,6 @@
 begin_class Main - -> -
 begin_method sum - -> -
-* b t1 -> $t1
+* b c -> $t1
 + a $t1 -> $t2
 return $t2 None -> None
 end_method sum - -> -
