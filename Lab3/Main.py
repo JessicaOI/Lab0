@@ -207,10 +207,26 @@ def execute_functions():
             generador, tree
         )  # Utilizamos el walker con el GeneradorCodigoIntermedio
         codigo_intermedio = generador.get_codigo_intermedio()
+
         generador.imprimir_codigo_intermedio()
 
         # Guarda el código intermedio en un archivo
         save_to_file(codigo_intermedio)
+
+        # Uso de la clase mips
+        translator = IntermediateToMIPS()
+
+        cuadruplos = translator.read_intermediate_code("codigo_intermedio.txt")
+
+        translator.translate(cuadruplos)
+
+        # Después de traducir, generas el código MIPS final.
+        mips_code = translator.generate_mips()
+
+        # Finalmente, guardas el código MIPS en un archivo.
+        translator.save_mips_to_file(mips_code, "mi_archivo_mips.txt")
+
+        
 
     except Exception as e:  # Captura otras excepciones para asegurar una salida limpia
 
@@ -1406,7 +1422,385 @@ class GeneradorCodigoIntermedio(YAPLListener):
             )
 
 
-# -------------------------Analisis Semantico---------------------------------------------
+# -------------------------Fin Generador codigo intermedio---------------------------------------------
+
+# -------------------------Traductor a lenguaje ensamblador MIPS---------------------------------------------
+
+
+# class RegisterManager:
+#     def __init__(self):
+#         self.registers = ["$t" + str(i) for i in range(10)]
+#         self.in_use = set()
+
+#     def get_register(self):
+#         for reg in self.registers:
+#             if reg not in self.in_use:
+#                 self.in_use.add(reg)
+#                 return reg
+#         raise Exception("All temporary registers in use!")
+
+#     def release_register(self, reg):
+#         if reg in self.in_use:
+#             self.in_use.remove(reg)
+
+
+# class IntermediateToMIPS:
+#     def __init__(self):
+#         self.output_code = []
+#         self.data_section = []
+#         self.strings_counter = 0
+#         self.variables = {}
+#         self.labels = set()
+#         self.stack_pointer_init_val = (
+#             10000  # Un valor arbitrario para el inicio de la pila.
+#         )
+#         self.strings = {}
+#         self.register_manager = RegisterManager()
+
+#     def add_string_to_data(self, string):
+#         string_label = f"str{self.strings_counter}"
+#         self.strings_counter += 1
+#         if string not in self.strings:  # Evitar duplicados
+#             self.strings[string] = string_label
+#             self.data_section.append(f'{string_label}: .asciiz "{string}"\n')
+#         return self.strings[string]
+
+#     def is_valid_variable_name(self, token):
+#         # Verifica si un token es un nombre de variable válido
+#         if token.startswith("$") or token.isdigit() or token.startswith('"'):
+#             return False  # No es una variable si es un registro, número o cadena
+#         if any(char in token for char in "+-*/:()"):
+#             return False  # No es una variable si contiene operadores o dos puntos
+#         if token in ["None", "main", "label", "goto", "if_false", "return", "param", "invoke_function"]:
+#             return False  # Palabras clave específicas que no son variables
+#         if token.startswith("L") and token[1:].isdigit():
+#             return False  # Excluir etiquetas como L1, L2, etc.
+#         if token.endswith("_class") or token.endswith("_method"):
+#             return False  # Excluir nombres de clases y métodos
+#         return True  # Si no se cumple ninguna de las condiciones anteriores, es una variable
+
+#     def detect_variables(self, intermediate_code):
+#         # Inicializa el conjunto de variables a declarar
+#         variables_to_declare = set()
+
+#         # Esta función detecta las variables y las agrega a la sección .data
+#         variables_to_declare -= set(self.strings.values())
+
+#         lines = intermediate_code.strip().split("\n")
+#         for line in lines:
+#             tokens = line.split()
+
+#             for token in tokens:
+#                 # Solo considera tokens que son nombres de variables válidos
+#                 if self.is_valid_variable_name(token):
+#                     variables_to_declare.add(token)
+
+#         # Agregar las variables a la sección de datos
+#         self.data_section = [f"{variable}: .word 0" for variable in sorted(variables_to_declare)]
+
+
+#     def push_to_stack(self, register):
+#         self.output_code.append(f"    subu $sp, $sp, 4")
+#         self.output_code.append(f"    sw {register}, 0($sp)")
+
+#     def pop_from_stack(self, register):
+#         self.output_code.append(f"    lw {register}, 0($sp)")
+#         self.output_code.append(f"    addu $sp, $sp, 4")
+
+#     def handle_params(self, param_list):
+#         # Asumimos que los parámetros se pasan mediante los registros $a0-$a3
+#         # y que no hay más de 4 parámetros
+#         for i, param in enumerate(param_list):
+#             register = f"$a{i}"
+#             if param == "None":
+#                 # Si el parámetro es None, no generamos ninguna instrucción.
+#                 continue
+#             if param.startswith('"'):
+#                 # Es una cadena, así que hay que añadirla a la sección de datos
+#                 string_label = self.add_string_to_data(param.strip('"'))
+#                 self.output_code.append(f"    la {register}, {string_label}")
+#             elif param.isdigit():
+#                 # Para valores inmediatos, usamos la instrucción 'li'
+#                 self.output_code.append(f"    li {register}, {param}")
+#             else:
+#                 # Para otros tipos, cargamos el valor desde la dirección de memoria en el registro correspondiente
+#                 self.output_code.append(f"    lw {register}, {param}")
+
+
+#     def generate_code(self, intermediate_code):
+#         self.detect_variables(intermediate_code)
+#         lines = intermediate_code.strip().split("\n")
+#         current_function = None
+
+#         for line in lines:
+#             tokens = line.split()
+#             if not tokens:
+#                 continue
+
+#             cmd = tokens[0]
+
+#             if cmd in ["+", "-", "*", "/"]:
+#                 reg1 = (
+#                     tokens[1]
+#                     if tokens[1].startswith("$t")
+#                     else self.register_manager.get_register()
+#                 )
+#                 reg2 = (
+#                     tokens[2]
+#                     if tokens[2].startswith("$t")
+#                     else self.register_manager.get_register()
+#                 )
+#                 result_reg = (
+#                     tokens[3]
+#                     if tokens[3].startswith("$t")
+#                     else self.register_manager.get_register()
+#                 )
+
+#                 if tokens[1] != reg1:
+#                     if tokens[1].isdigit() or tokens[1].startswith("$"):
+#                         self.output_code.append(f"    li {reg1}, {tokens[1]}")
+#                     else:
+#                         self.output_code.append(f"    lw {reg1}, {tokens[1]}")
+#                 if tokens[2] != reg2:
+#                     if tokens[2].isdigit() or tokens[2].startswith("$"):
+#                         self.output_code.append(f"    li {reg2}, {tokens[2]}")
+#                     else:
+#                         self.output_code.append(f"    lw {reg2}, {tokens[2]}")
+
+#                 operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cmd]
+#                 if cmd == "/":
+#                     # Manejo de división
+#                     self.output_code.append(f"    div {reg1}, {reg2}")
+#                     self.output_code.append(f"    mflo {result_reg}")
+#                 elif cmd == "*":
+#                     # Manejo de multiplicación
+#                     self.output_code.append(f"    mul {result_reg}, {reg1}, {reg2}")
+#                 else:
+#                     self.output_code.append(
+#                         f"    {operation} {result_reg}, {reg1}, {reg2}"
+#                     )
+
+#                 # Solamente almacenar el resultado si es necesario
+#                 if tokens[3] != result_reg:
+#                     self.output_code.append(f"    sw {result_reg}, {tokens[3]}")
+
+#                 # Liberar registros después de usar su contenido
+#                 if not tokens[1].startswith("$t"):
+#                     self.register_manager.release_register(reg1)
+#                 if not tokens[2].startswith("$t"):
+#                     self.register_manager.release_register(reg2)
+#                 self.register_manager.release_register(result_reg)
+
+#             elif cmd == "=":
+#                 source_reg = (
+#                     tokens[1]
+#                     if tokens[1].startswith("$t")
+#                     else self.register_manager.get_register()
+#                 )
+#                 if tokens[1].startswith('"'):
+#                     # Manejo de asignación de strings
+#                     string_label = self.add_string_to_data(tokens[1].strip('"'))
+#                     self.output_code.append(f"    la {source_reg}, {string_label}")
+
+#                 if not tokens[1].startswith("$t"):
+#                     if tokens[1].isdigit():
+#                         self.output_code.append(f"    li {source_reg}, {tokens[1]}")
+#                     else:
+#                         self.output_code.append(f"    lw {source_reg}, {tokens[1]}")
+
+#                 self.output_code.append(f"    sw {source_reg}, {tokens[3]}")
+
+#                 if not tokens[1].startswith("$t"):
+#                     self.register_manager.release_register(source_reg)
+
+#             elif cmd == "if_false":
+#                 # Corrección en el manejo de la condición de salto
+#                 self.output_code.append(f"    beqz {tokens[1]}, {tokens[3]}")
+
+#             elif cmd == "goto":
+#                 self.output_code.append(f"    j {tokens[3]}")
+
+#             elif cmd == "label":
+#                 self.labels.add(tokens[3])
+#                 self.output_code.append(f"{tokens[3]}:")
+
+#             elif cmd == "return":
+#                 if tokens[1].startswith('"'):
+#                     # Manejo de retorno de strings
+#                     string_label = self.add_string_to_data(tokens[1].strip('"'))
+#                     self.output_code.append(f"    la $v0, {string_label}")
+#                 elif tokens[1] != "None":
+#                     self.output_code.append(f"    lw $v0, {tokens[1]}")  # Load the variable into $v0
+#                 self.output_code.append("    jr $ra")
+
+#             elif cmd == "begin_method":
+#                 current_function = tokens[1]
+#                 self.output_code.append(f"{current_function}:")
+#                 if current_function == "main":
+#                     self.output_code.append("    move $sp, $fp")  # Set up stack pointer for main
+
+#             elif cmd == "end_method":
+#                 if current_function != "main":
+#                     self.output_code.append("    move $fp, $sp")  # Reset frame pointer for non-main methods
+#                 self.output_code.append("    jr $ra")
+#                 current_function = None
+
+#             elif cmd == "param":
+#                 # Aquí asumimos que todos los parámetros se pasan en una sola línea
+#                 # Si tu código intermedio tiene un 'param' por línea, tendrás que ajustar esto
+#                 param_list = tokens[1:]  # Obtiene todos los parámetros de la línea
+#                 self.handle_params(param_list)
+
+
+
+#             elif cmd == "invoke_function":
+#                 function_name = tokens[1]
+#                 result_reg = tokens[3]
+#                 # Asegurarse de que el resultado de la función se almacene correctamente
+#                 self.output_code.append(f"    jal {function_name}")
+#                 if result_reg != "None":
+#                     self.output_code.append(f"    sw $v0, {result_reg}")
+
+
+#         final_code = (
+#             ".data\n"
+#             + "\n".join(sorted(set(self.data_section)))  # Eliminar duplicados
+#             + ".text\n"
+#             + ".globl main\n"
+#             + "\n".join(self.output_code)
+#         )
+#         return final_code
+
+#     def save_mips_to_file(self, mips_code, filename="output_mips.txt"):
+#         with open(filename, "w") as file:
+#             file.write(mips_code)
+
+
+class RegisterManager:
+    def __init__(self):
+        self.registers = ["$t" + str(i) for i in range(8)]
+        self.available_registers = set(self.registers)
+
+    def get_register(self):
+        if not self.available_registers:
+            raise Exception("No hay registros temporales disponibles.")
+        return self.available_registers.pop()
+
+    def release_register(self, reg):
+        if reg not in self.registers:
+            raise Exception(f"El registro {reg} no es un registro temporal válido.")
+        self.available_registers.add(reg)
+
+
+class IntermediateToMIPS:
+    def __init__(self):
+        self.data_section = []
+        self.text_section = []
+        self.register_manager = RegisterManager()
+        self.label_counter = 0
+        self.variables = {}
+
+    def add_data(self, name, type="word", value=0):
+        if type == "word":
+            self.data_section.append(f"{name}: .word {value}")
+        elif type == "asciiz":
+            self.data_section.append(f'{name}: .asciiz "{value}"')
+
+    def add_text(self, line):
+        self.text_section.append(line)
+
+    def new_label(self):
+        label = f"L{self.label_counter}"
+        self.label_counter += 1
+        return label
+
+    def read_intermediate_code(self, filename):
+        with open(filename, 'r') as file:
+            lines = file.readlines()
+
+        cuadruplos = []
+        for line in lines:
+            parts = line.strip().split()
+            if not parts:
+                continue  # Ignorar líneas vacías
+            # Asumimos que los cuádruplos tienen 4 partes. Ajusta según sea necesario.
+            cuad = Cuadruplo(*parts)
+            cuadruplos.append(cuad)
+        
+        return cuadruplos
+
+    def translate(self, intermediate_code):
+        for cuad in intermediate_code:
+            # Determine the type of the cuadruple and handle accordingly
+            if cuad.operador in ["+", "-", "*", "/"]:
+                # Arithmetic operations
+                self.handle_arithmetic(cuad)
+            elif cuad.operador == "=":
+                # Assignments
+                self.handle_assignment(cuad)
+            elif cuad.operador == "if_false":
+                # Conditional branching
+                self.handle_if_false(cuad)
+            elif cuad.operador == "goto":
+                # Unconditional jump
+                self.handle_goto(cuad)
+            elif cuad.operador == "label":
+                # Label definition
+                self.handle_label(cuad)
+            elif cuad.operador == "return":
+                # Function return
+                self.handle_return(cuad)
+            elif cuad.operador == "param":
+                # Parameter passing
+                self.handle_param(cuad)
+            elif cuad.operador == "invoke_function":
+                # Function invocation
+                self.handle_function_invocation(cuad)
+            # Add more elifs for other operations like 'begin_class', 'end_class', etc.
+
+    def generate_mips(self):
+        return ".data\n" + "\n".join(self.data_section) + "\n.text\n" + "\n".join(self.text_section)
+
+    def handle_arithmetic(self, cuad):
+        reg1 = self.load_to_register(cuad.arg1)
+        reg2 = self.load_to_register(cuad.arg2)
+        result_reg = self.register_manager.get_register()
+
+        operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cuad.operador]
+        if cuad.operador == "/":
+            self.add_text(f"div {reg1}, {reg2}")
+            self.add_text(f"mflo {result_reg}")
+        else:
+            self.add_text(f"{operation} {result_reg}, {reg1}, {reg2}")
+
+        self.store_from_register(result_reg, cuad.destino)
+        self.register_manager.release_register(reg1)
+        self.register_manager.release_register(reg2)
+        self.register_manager.release_register(result_reg)
+
+    def handle_assignment(self, cuad):
+        src_reg = self.load_to_register(cuad.arg1)
+        self.store_from_register(src_reg, cuad.destino)
+        self.register_manager.release_register(src_reg)
+
+    def load_operand(self, reg, operand):
+        if operand.isdigit():
+            self.add_text(f"li {reg}, {operand}")
+        elif operand.startswith("$"):
+            self.add_text(f"move {reg}, {operand}")
+        else:
+            # Asumimos que todas las variables se han recopilado previamente y están en self.variables
+            if operand not in self.variables:
+                # Si es la primera vez que vemos esta variable, añadirla a la sección de datos
+                self.add_data(operand)
+                self.variables[operand] = 0  # Valor predeterminado de 0
+            self.add_text(f"lw {reg}, {operand}")
+
+    def save_mips_to_file(self, mips_code, filename="mi_archivo_mips.txt"):
+        with open(filename, "w") as file:
+            file.write(mips_code)
+
+
 def main():
     global text_editor
 
