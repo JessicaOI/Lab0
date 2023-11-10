@@ -213,10 +213,8 @@ def execute_functions():
         codigo_intermedio = generador.get_codigo_intermedio()
         generador.imprimir_codigo_intermedio()
         # Uso de la clase mips
-        translator = IntermediateToMIPS()
-        mips_code = translator.generate_code(
-            codigo_intermedio
-        )  # 'your_intermediate_code' es el código intermedio que has proporcionado
+        translator = IntermediateToMIPS(listener.symbol_table)
+        mips_code = translator.generate_code(codigo_intermedio)  # 'your_intermediate_code' es el código intermedio que has proporcionado
         translator.save_mips_to_file(mips_code, "mi_archivo_mips.txt")
 
         # Guarda el código intermedio en un archivo
@@ -1456,9 +1454,9 @@ class RegisterManager:
             self.in_use.remove(reg)
 
 
-class IntermediateToMIPS:
-    def __init__(self):
-        self.symbol_table = SymbolTable()
+class IntermediateToMIPS():
+    def __init__(self, symbol_table):
+        self.symbol_table = symbol_table
         self.output_code = []
         self.data_section = []
         self.strings_counter = 0
