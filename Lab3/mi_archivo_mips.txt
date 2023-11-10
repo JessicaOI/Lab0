@@ -8,28 +8,26 @@ sum:
     lw $t0, b
     lw $t1, c
     mul $t1, $t0, $t1
-    lw $t0, a
-    add $t2, $t0, $t1
+    lw $t2, a
+    add $t2, $t2, $t1
     lw $v0, $t2
     jr $ra
-    move $fp, $sp
     jr $ra
 main:
-    move $sp, $fp
-    lw $t0, var1
-    sw $t0, $t3
+    lw $t3, var1
+    sw $t3, $t3
     lw $t3, $t3
     beqz $t3, L1
     li $a0, 5
-    li $a0, 7
-    li $a0, 9
+    li $a1, 7
+    li $a2, 9
     jal sum
-    move $t4, $v0
+    sw $v0, $t4
     sw $t4, var3
     j L2
 L1:
-    lw $t0, "intento"
-    sw $t0, var2
+    lw $t3, "intento"
+    sw $t3, var2
 L2:
     lw $v0, var2
     jr $ra

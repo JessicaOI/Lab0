@@ -1534,28 +1534,42 @@ class IntermediateToMIPS():
 
     def handle_params(self, param_list):
         # Asumimos que los parámetros se pasan mediante los registros $a0-$a3
-        # y que no hay más de 4 parámetros
-        for i, param in enumerate(param_list):
+        for i, param in enumerate(param_list[:4]):  # Máximo 4 parámetros
             register = f"$a{i}"
-            if param == "None":
-                # Si el parámetro es None, no generamos ninguna instrucción.
-                continue
             if param.startswith('"'):
-                # Es una cadena, así que hay que añadirla a la sección de datos
+                # Manejo de cadenas
                 string_label = self.add_string_to_data(param.strip('"'))
                 self.output_code.append(f"    la {register}, {string_label}")
             elif param.isdigit():
-                # Para valores inmediatos, usamos la instrucción 'li'
+                # Valores inmediatos
                 self.output_code.append(f"    li {register}, {param}")
             else:
-                # Para otros tipos, cargamos el valor desde la dirección de memoria en el registro correspondiente
-                self.output_code.append(f"    lw {register}, {param}")
+                # Carga desde memoria omitida, se asume que el valor ya está en el registro correcto
+                pass
 
+    def get_operand_register(self, operand, is_dest=False):
+        if operand.isdigit() or (operand.startswith('-') and operand[1:].isdigit()):
+            # Es un valor inmediato
+            temp_reg = self.register_manager.get_register()
+            self.output_code.append(f"    li {temp_reg}, {operand}")
+            return temp_reg
+        elif operand.startswith("$"):
+            # Es un registro
+            return operand
+        elif is_dest:
+            # Es un registro de destino para el resultado
+            return self.register_manager.get_register()
+        else:
+            # Es una variable, cargar desde la memoria
+            temp_reg = self.register_manager.get_register()
+            self.output_code.append(f"    lw {temp_reg}, {operand}")
+            return temp_reg
 
     def generate_code(self, intermediate_code):
         self.detect_variables(intermediate_code)
         lines = intermediate_code.strip().split("\n")
         current_function = None
+        param_index = 0  # Inicialización de param_index
 
         for line in lines:
             tokens = line.split()
@@ -1564,53 +1578,25 @@ class IntermediateToMIPS():
 
             cmd = tokens[0]
 
-            if cmd in ["+", "-", "*", "/"]:
-                reg1 = (
-                    tokens[1]
-                    if tokens[1].startswith("$t")
-                    else self.register_manager.get_register()
-                )
-                reg2 = (
-                    tokens[2]
-                    if tokens[2].startswith("$t")
-                    else self.register_manager.get_register()
-                )
-                result_reg = (
-                    tokens[3]
-                    if tokens[3].startswith("$t")
-                    else self.register_manager.get_register()
-                )
+            if cmd == "begin_method":
+                current_function = tokens[1]
+                self.output_code.append(f"{current_function}:")
+            elif cmd == "end_method":
+                self.output_code.append("    jr $ra")
+                current_function = None
+            elif cmd in ["+", "-", "*", "/"]:
+                # Determinar los operandos
+                reg1 = self.get_operand_register(tokens[1])
+                reg2 = self.get_operand_register(tokens[2])
+                result_reg = self.get_operand_register(tokens[3], is_dest=True)
 
-                if tokens[1] != reg1:
-                    if tokens[1].isdigit() or tokens[1].startswith("$"):
-                        self.output_code.append(f"    li {reg1}, {tokens[1]}")
-                    else:
-                        self.output_code.append(f"    lw {reg1}, {tokens[1]}")
-                if tokens[2] != reg2:
-                    if tokens[2].isdigit() or tokens[2].startswith("$"):
-                        self.output_code.append(f"    li {reg2}, {tokens[2]}")
-                    else:
-                        self.output_code.append(f"    lw {reg2}, {tokens[2]}")
-
+                # Generar la operación aritmética
                 operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cmd]
                 if cmd == "/":
                     self.output_code.append(f"    {operation} {reg1}, {reg2}")
                     self.output_code.append(f"    mflo {result_reg}")
                 else:
-                    self.output_code.append(
-                        f"    {operation} {result_reg}, {reg1}, {reg2}"
-                    )
-
-                # Solamente almacenar el resultado si es necesario
-                if tokens[3] != result_reg:
-                    self.output_code.append(f"    sw {result_reg}, {tokens[3]}")
-
-                # Liberar registros después de usar su contenido
-                if not tokens[1].startswith("$t"):
-                    self.register_manager.release_register(reg1)
-                if not tokens[2].startswith("$t"):
-                    self.register_manager.release_register(reg2)
-                self.register_manager.release_register(result_reg)
+                    self.output_code.append(f"    {operation} {result_reg}, {reg1}, {reg2}")
 
             elif cmd == "=":
                 source_reg = (
@@ -1649,36 +1635,32 @@ class IntermediateToMIPS():
                     self.output_code.append(f"    lw $v0, {tokens[1]}")  # Load the variable into $v0
                 self.output_code.append("    jr $ra")
 
-            elif cmd == "begin_method":
-                current_function = tokens[1]
-                self.output_code.append(f"{current_function}:")
-                if current_function == "main":
-                    self.output_code.append("    move $sp, $fp")  # Set up stack pointer for main
+            # elif cmd == "begin_method":
+            #     current_function = tokens[1]
+            #     self.output_code.append(f"{current_function}:")
+            #     param_index = 0
 
-            elif cmd == "end_method":
-                if current_function != "main":
-                    self.output_code.append("    move $fp, $sp")  # Reset frame pointer for non-main methods
-                self.output_code.append("    jr $ra")
-                current_function = None
+            # elif cmd == "end_method":
+            #     self.output_code.append("    jr $ra")
+            #     current_function = None
 
             elif cmd == "param":
-                # Aquí asumimos que todos los parámetros se pasan en una sola línea
-                # Si tu código intermedio tiene un 'param' por línea, tendrás que ajustar esto
-                param_list = tokens[1:]  # Obtiene todos los parámetros de la línea
-                self.handle_params(param_list)
-
-
+                param = tokens[1]
+                register = f"$a{param_index}"
+                if param.isdigit() or (param.startswith('-') and param[1:].isdigit()):
+                    self.output_code.append(f"    li {register}, {param}")
+                elif param.startswith('"'):
+                    string_label = self.add_string_to_data(param.strip('"'))
+                    self.output_code.append(f"    la {register}, {string_label}")
+                param_index += 1  # Incrementa param_index para el próximo parámetro
 
             elif cmd == "invoke_function":
                 function_name = tokens[1]
-                result_reg = tokens[3]
                 self.output_code.append(f"    jal {function_name}")
+                result_reg = tokens[3]
                 if result_reg != "None":
-                    self.output_code.append(f"    move {result_reg}, $v0")
-        # print(".data section content:")
-        # for line in self.data_section:
-        #     print(line)
-        # print("\n")
+                    self.output_code.append(f"    sw $v0, {result_reg}")
+
 
         final_code = (
             ".data\n"
