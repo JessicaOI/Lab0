@@ -1,13 +1,5 @@
 .data
-=: .word 0
-Main: .word 0
-a: .word 0
-b: .word 0
-c: .word 0
-sum: .word 0
-var1: .word 0
-var2: .word 0
-var3: .word 0
+
 .text
 .globl main
 sum:

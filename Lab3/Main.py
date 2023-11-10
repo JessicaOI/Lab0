@@ -445,6 +445,7 @@ class SymbolTable:
             "Line Num",
             "Line Pos",
             "Semantic Type",
+            "Num params",
             "Param Types",
             "Pass Method",
             "Parent Class",
@@ -457,8 +458,9 @@ class SymbolTable:
         for symbol in self.symbols:
             # Agrega 'symbol.symbol_type' a la lista de valores de cada símbolo
             symbol_data = list(symbol.__dict__.values())
-            symbol_data.append(getattr(symbol, 'symbol_type', 'N/A'))  # Añade symbol_type o 'N/A' si no está presente
-            table_data.append(list(symbol.__dict__.values()))
+            print(symbol_data)
+            #symbol_data.append(getattr(symbol, 'symbol_type', 'N/A'))  # Añade symbol_type o 'N/A' si no está presente
+            table_data.append(symbol_data)
 
         print(tabulate(table_data, headers=headers, tablefmt="pretty"))
 
@@ -1114,6 +1116,10 @@ class MyYAPLListener(YAPLListener):
             "Num Params",
             "Tipo de Parametros",
             "Metodo para paso de parámetros",
+            "Clase del padre",
+            "Valor default",
+            "Tamaño en bytes"
+            "Tipo del simbolo"
         ]
 
         # --------Imprimir tabla de simbolos--------
@@ -1452,6 +1458,7 @@ class RegisterManager:
 
 class IntermediateToMIPS:
     def __init__(self):
+        self.symbol_table = SymbolTable()
         self.output_code = []
         self.data_section = []
         self.strings_counter = 0
@@ -1486,19 +1493,46 @@ class IntermediateToMIPS:
 
     def detect_variables(self, intermediate_code):
         # Esta función detecta las variables y las agrega a la sección .data
-        variables_to_declare = set()
+        #variables_to_declare = set()
+        print('aloooooooooooooooooooo')
+        print(self.symbol_table.get_symbol('var1','Main'))
+        for symbol in self.symbol_table.symbols:
+            # Agrega 'symbol.symbol_type' a la lista de valores de cada símbolo
+            symbol_data = list(symbol.__dict__.values())
+            print('si es???')
+            print(symbol_data)
 
         lines = intermediate_code.strip().split("\n")
         for line in lines:
             tokens = line.split()
-
+            
             for token in tokens:
                 # Solo considera tokens que son nombres de variables válidos
                 if self.is_valid_variable_name(token):
-                    variables_to_declare.add(token)
-
-        # Agregar las variables a la sección de datos
-        self.data_section = [f"{variable}: .word 0" for variable in sorted(variables_to_declare)]
+                    # Buscar el símbolo en la tabla de símbolos para obtener el tipo
+                    symbol = next((s for s in self.symbol_table.symbols if s.name == token), None)
+                    print(symbol)
+                    if symbol:
+                        print(f"Detectado símbolo: {symbol.name} de tipo {symbol.symbol_type}")  # Debugging line
+                        if symbol.symbol_type == SymbolType.VARIABLE:
+                            self.data_section.append(f"{token}: .word 0")
+                        elif symbol.symbol_type == SymbolType.CLASS:
+                            # Manejar según sea necesario para las clases
+                            pass
+                        elif symbol.symbol_type == SymbolType.FUNCTION:
+                            # Las funciones no se declaran en .data
+                            pass
+                        elif symbol.symbol_type == SymbolType.PARAMETER:
+                            # Los parámetros se manejan en el stack
+                            pass
+                        # Añadir otros tipos de símbolos según sea necesario
+                    else:
+                        # Si no se encuentra el símbolo, manejar según sea necesario
+                        pass
+            print("Contenido completo de la sección .data después de detect_variables:")
+            for data in self.data_section:
+                print(data)
+            print("\n")
 
 
     def push_to_stack(self, register):
@@ -1530,6 +1564,8 @@ class IntermediateToMIPS:
 
 
     def generate_code(self, intermediate_code):
+        print('Desde el generatecode')
+        print(self.symbol_table.symbols)
         self.detect_variables(intermediate_code)
         lines = intermediate_code.strip().split("\n")
         current_function = None
@@ -1652,6 +1688,10 @@ class IntermediateToMIPS:
                 self.output_code.append(f"    jal {function_name}")
                 if result_reg != "None":
                     self.output_code.append(f"    move {result_reg}, $v0")
+        print(".data section content:")
+        for line in self.data_section:
+            print(line)
+        print("\n")
 
         final_code = (
             ".data\n"
