@@ -15,6 +15,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, Text, simpledialog
 import inspect
 import traceback
+import os
 
 # ---------------------GUI------------------------------------------------------------
 text_editor = None
@@ -373,6 +374,12 @@ def plot_tree(parser, tree):
 
 # ----------------------Fin analisis sintanctico--------------------------------------
 
+class SymbolType:
+    CLASS = 'Class'
+    FUNCTION = 'Function'
+    VARIABLE = 'Variable'
+    PARAMETER = 'Parameter'
+
 # -------------------------Declaraciones Tabla de simbolos----------------------------
 class Symbol:
     def __init__(
@@ -393,6 +400,7 @@ class Symbol:
         default_value=None,
         byte_size=None,
         # value=None,
+        symbol_type=None,
     ):
         self.name = name
         self.type = type
@@ -410,6 +418,7 @@ class Symbol:
         self.default_value = default_value
         self.byte_size = byte_size
         # self.value = value
+        self.symbol_type = symbol_type
 
 
 class SymbolTable:
@@ -421,8 +430,6 @@ class SymbolTable:
 
     def add_symbol(self, symbol):
         self.symbols.append(symbol)
-
-    import os
 
     def print_table(self):
         # Limpiar la consola antes de imprimir
@@ -444,9 +451,13 @@ class SymbolTable:
             "Default Value",
             "Byte Size",
             # "Value",
+            "Symbol Type",
         ]
         table_data = []
         for symbol in self.symbols:
+            # Agrega 'symbol.symbol_type' a la lista de valores de cada símbolo
+            symbol_data = list(symbol.__dict__.values())
+            symbol_data.append(getattr(symbol, 'symbol_type', 'N/A'))  # Añade symbol_type o 'N/A' si no está presente
             table_data.append(list(symbol.__dict__.values()))
 
         print(tabulate(table_data, headers=headers, tablefmt="pretty"))
@@ -669,6 +680,7 @@ class MyYAPLListener(YAPLListener):
             pass_method="byValue",
             byte_size=0,
             parent_class=parent_class_name,
+            symbol_type=SymbolType.CLASS,
         )
         self.symbol_table.add_symbol(symbol)
         self.current_memory_position += 1
@@ -746,6 +758,11 @@ class MyYAPLListener(YAPLListener):
             object_id = object_id.getText()
             type_id = type_id.getText()
 
+            if ctx.LPAREN():  # Si hay paréntesis, es un método
+                symbol_type = SymbolType.FUNCTION
+            else:  # De lo contrario, es una variable
+                symbol_type = SymbolType.VARIABLE
+
             # Estableciendo valores default y el tamaño en bytes
             default_value = None
             feature_byte_size = self.type_size_map.get(type_id, 0)
@@ -773,6 +790,7 @@ class MyYAPLListener(YAPLListener):
                 pass_method="byValue",
                 default_value=default_value,
                 byte_size=feature_byte_size,
+                symbol_type=symbol_type,
             )
 
             if self.symbol_table.symbol_exists(
