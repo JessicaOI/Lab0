@@ -456,7 +456,7 @@ class SymbolTable:
         for symbol in self.symbols:
             # Agrega 'symbol.symbol_type' a la lista de valores de cada símbolo
             symbol_data = list(symbol.__dict__.values())
-            print(symbol_data)
+            #print(symbol_data)
             #symbol_data.append(getattr(symbol, 'symbol_type', 'N/A'))  # Añade symbol_type o 'N/A' si no está presente
             table_data.append(symbol_data)
 
@@ -1491,46 +1491,37 @@ class IntermediateToMIPS():
 
     def detect_variables(self, intermediate_code):
         # Esta función detecta las variables y las agrega a la sección .data
-        #variables_to_declare = set()
-        print('aloooooooooooooooooooo')
-        print(self.symbol_table.get_symbol('var1','Main'))
-        for symbol in self.symbol_table.symbols:
-            # Agrega 'symbol.symbol_type' a la lista de valores de cada símbolo
-            symbol_data = list(symbol.__dict__.values())
-            print('si es???')
-            print(symbol_data)
 
         lines = intermediate_code.strip().split("\n")
+        declared_variables = set()
+
         for line in lines:
             tokens = line.split()
             
             for token in tokens:
                 # Solo considera tokens que son nombres de variables válidos
-                if self.is_valid_variable_name(token):
+                if self.is_valid_variable_name(token) and token not in declared_variables:
                     # Buscar el símbolo en la tabla de símbolos para obtener el tipo
                     symbol = next((s for s in self.symbol_table.symbols if s.name == token), None)
-                    print(symbol)
                     if symbol:
-                        print(f"Detectado símbolo: {symbol.name} de tipo {symbol.symbol_type}")  # Debugging line
+                        declared_variables.add(token)  # Marcar la variable como declarada
+                        # Detectado símbolo y su tipo, procede según el tipo semántico
                         if symbol.symbol_type == SymbolType.VARIABLE:
-                            self.data_section.append(f"{token}: .word 0")
-                        elif symbol.symbol_type == SymbolType.CLASS:
-                            # Manejar según sea necesario para las clases
-                            pass
-                        elif symbol.symbol_type == SymbolType.FUNCTION:
-                            # Las funciones no se declaran en .data
-                            pass
-                        elif symbol.symbol_type == SymbolType.PARAMETER:
-                            # Los parámetros se manejan en el stack
-                            pass
-                        # Añadir otros tipos de símbolos según sea necesario
+                            if symbol.semantic_type == "Int":
+                                self.data_section.append(f"{token}: .word 0")
+                            elif symbol.semantic_type == "String":
+                                self.data_section.append(f'{token}: .asciiz ""')
+                            elif symbol.semantic_type == "Bool":
+                                self.data_section.append(f"{token}: .word 1")  # True por defecto
+                        # ... otros tipos de símbolos ...
                     else:
-                        # Si no se encuentra el símbolo, manejar según sea necesario
+                        #print(f"El símbolo no se encontró en la tabla de símbolos: {token}")
                         pass
-            print("Contenido completo de la sección .data después de detect_variables:")
-            for data in self.data_section:
-                print(data)
-            print("\n")
+
+            # print("Contenido completo de la sección .data después de detect_variables:")
+            # for data in self.data_section:
+            #     print(data)
+            # print("\n")
 
 
     def push_to_stack(self, register):
@@ -1562,8 +1553,6 @@ class IntermediateToMIPS():
 
 
     def generate_code(self, intermediate_code):
-        print('Desde el generatecode')
-        print(self.symbol_table.symbols)
         self.detect_variables(intermediate_code)
         lines = intermediate_code.strip().split("\n")
         current_function = None
@@ -1686,10 +1675,10 @@ class IntermediateToMIPS():
                 self.output_code.append(f"    jal {function_name}")
                 if result_reg != "None":
                     self.output_code.append(f"    move {result_reg}, $v0")
-        print(".data section content:")
-        for line in self.data_section:
-            print(line)
-        print("\n")
+        # print(".data section content:")
+        # for line in self.data_section:
+        #     print(line)
+        # print("\n")
 
         final_code = (
             ".data\n"

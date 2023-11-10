@@ -1,8 +1,7 @@
 .data
-var1: .word 0
+var1: .word 1
 var3: .word 0
-var2: .word 0
-var2: .word 0
+var2: .asciiz ""
 .text
 .globl main
 sum:
