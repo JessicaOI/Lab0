@@ -194,55 +194,55 @@ def execute_functions():
         return
 
     # Si llegamos aquí, no hay errores léxicos ni sintácticos
-    print("Análisis léxico y sintáctico completado sin errores.")
+    #print("Análisis léxico y sintáctico completado sin errores.")
 
-    # try:
-    #     tree = (
-    #         parser.program()
-    #     )  # Esto creará un árbol incluso si hay errores sintácticos.
+    try:
+        tree = (
+            parser.program()
+        )  # Esto creará un árbol incluso si hay errores sintácticos.
 
-    #     # print(Trees.toStringTree(tree, None, parser))
+        # print(Trees.toStringTree(tree, None, parser))
 
-    #     plot_tree(parser, tree)
+        plot_tree(parser, tree)
 
-    #     # Camina por el árbol incluso si hay errores sintácticos
-    #     listener = MyYAPLListener()
-    #     walker = ParseTreeWalker()
-    #     walker.walk(listener, tree)
+        # Camina por el árbol incluso si hay errores sintácticos
+        listener = MyYAPLListener()
+        walker = ParseTreeWalker()
+        walker.walk(listener, tree)
 
-    #     # Ahora, al final, verifica e imprime todos los errores detectados
-    #     if parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0:
-    #         print("Se detectaron los siguientes errores:")
+        # Ahora, al final, verifica e imprime todos los errores detectados
+        if parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0:
+            print("Se detectaron los siguientes errores:")
 
-    #         for error in error_listener.error_messages:
-    #             print("Error Sintáctico: " + error)
+            for error in error_listener.error_messages:
+                print("Error Sintáctico: " + error)
 
-    #         for error in listener.semantic_errors:
-    #             print("Error Semántico: " + error)
+            for error in listener.semantic_errors:
+                print("Error Semántico: " + error)
 
-    #         print("Finalizando el programa.")
-    #         return
+            print("Finalizando el programa.")
+            return
 
-        # # Usando el Generador
-        # generador = GeneradorCodigoIntermedio()
-        # walker.walk(
-        #     generador, tree
-        # )  # Utilizamos el walker con el GeneradorCodigoIntermedio
-        # codigo_intermedio = generador.get_codigo_intermedio()
-        # generador.imprimir_codigo_intermedio()
-        # # Uso de la clase mips
-        # translator = IntermediateToMIPS(listener.symbol_table)
-        # mips_code = translator.generate_code(codigo_intermedio)  # 'your_intermediate_code' es el código intermedio que has proporcionado
-        # translator.save_mips_to_file(mips_code, "mi_archivo_mips.txt")
+        # Usando el Generador
+        generador = GeneradorCodigoIntermedio()
+        walker.walk(
+            generador, tree
+        )  # Utilizamos el walker con el GeneradorCodigoIntermedio
+        codigo_intermedio = generador.get_codigo_intermedio()
+        generador.imprimir_codigo_intermedio()
+        # Uso de la clase mips
+        translator = IntermediateToMIPS(listener.symbol_table)
+        mips_code = translator.generate_code(codigo_intermedio)  # 'your_intermediate_code' es el código intermedio que has proporcionado
+        translator.save_mips_to_file(mips_code, "mi_archivo_mips.txt")
 
-        # # Guarda el código intermedio en un archivo
-        # save_to_file(codigo_intermedio)
+        # Guarda el código intermedio en un archivo
+        save_to_file(codigo_intermedio)
 
-    # except Exception as e:  # Captura otras excepciones para asegurar una salida limpia
+    except Exception as e:  # Captura otras excepciones para asegurar una salida limpia
 
-    #     print(f"Error: {e}")
-    #     traceback.print_exc()  # Imprime la traza completa del error
-    #     print("Finalizando el programa debido a un error inesperado.")
+        print(f"Error: {e}")
+        traceback.print_exc()  # Imprime la traza completa del error
+        print("Finalizando el programa debido a un error inesperado.")
 
 
 # -------------------------------------Fin GUI------------------------------------
@@ -286,6 +286,7 @@ class CustomErrorListener(ErrorListener):
 
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
         # Asegúrate de que cada mensaje de error sea único
+
         if "missing ')' at" in msg or (
             "mismatched input" in msg and offendingSymbol.text == "("
         ):
@@ -332,8 +333,13 @@ class CustomErrorListener(ErrorListener):
             error_msg = f"Linea {line}:{column} Error: Tipo incorrecto para el método de IO"
         elif "call to undefined function" in msg:
             error_msg = f"Linea {line}:{column} Error: Llamada a función no definida en IO"
+
         else:
-            error_msg = f"Linea {line}:{column} {msg}"
+            # Ignora errores específicos relacionados con la clase 'IO'
+            if "mismatched input '<EOF>' expecting {'class', 'IO'}" in msg:
+                return
+            else:
+                error_msg = f"Linea {line}:{column} {msg}"
 
         self.error_messages.add(error_msg)
 
@@ -1248,7 +1254,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.add_cuadruplo(Cuadruplo("end_method", func_name, "-", "-"))
             self.exit_scope()
 
-    def enterExpressionStatement(self, ctx: YAPLParser.ExpressionStatementContext):
+    def enterExpressionStatement(self, ctx: YAPLParser.UserMethodCallContext):
         statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
 
         if statement_key not in self.processed_statements:
@@ -1259,7 +1265,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
             # Liberar la variable temporal utilizada en esta expresión, si es aplicable.
             self.release_temp(value)
 
-    # def exitExpressionStatement(self, ctx: YAPLParser.ExpressionStatementContext):
+    # def exitExpressionStatement(self, ctx: YAPLParser.UserMethodCallContext):
     #     statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
 
     #     if statement_key not in self.processed_statements:
@@ -1297,7 +1303,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
     def process_statement_block(self, block_statement):
         for expression_statement in block_statement.getTypedRuleContexts(
-            YAPLParser.ExpressionStatementContext
+            YAPLParser.UserMethodCallContext
         ):
             if expression_statement not in self.processed_statements:
                 self.processed_statements.add(expression_statement)
@@ -1362,7 +1368,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
                 while_statement = ctx.statement(0)
                 for expression_statement in while_statement.getTypedRuleContexts(
-                    YAPLParser.ExpressionStatementContext
+                    YAPLParser.UserMethodCallContext
                 ):
                     self.processed_statements.add(expression_statement)
                     self.enterExpressionStatement(expression_statement)
@@ -1379,14 +1385,14 @@ class GeneradorCodigoIntermedio(YAPLListener):
                     if ctx in self.processed_statements:
                         return
                     for expression_statement in ctx.getTypedRuleContexts(
-                        YAPLParser.ExpressionStatementContext
+                        YAPLParser.UserMethodCallContext
                     ):
                         self.enterExpressionStatement(expression_statement)
 
             for statement in ctx.statement():
                 self.processed_statements.add(statement)
                 for expression_statement in statement.getTypedRuleContexts(
-                    YAPLParser.ExpressionStatementContext
+                    YAPLParser.UserMethodCallContext
                 ):
                     self.processed_statements.add(expression_statement)
 

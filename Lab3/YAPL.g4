@@ -7,32 +7,35 @@ classDef: CLASS TYPE_ID (INHERITS TYPE_ID)? '{' feature* '}' ';' | ioClassDef;
 
 ioClassDef: IO '{' ioFeature* '}' ';';
 ioFeature: 
-    'promptBool' LPAREN STRING_TYPE RPAREN COLON BOOL '{' '/* implementation */' '}' ';' |
-    'promptString' LPAREN STRING_TYPE RPAREN COLON STRING_TYPE '{' '/* implementation */' '}' ';' |
-    'promptInt' LPAREN STRING_TYPE RPAREN COLON INT_TYPE '{' '/* implementation */' '}' ';' |
-    'printInt' LPAREN INT_TYPE RPAREN COLON 'SELF_TYPE' '{' '/* implementation */' '}' ';' |
-    'printString' LPAREN STRING_TYPE RPAREN COLON 'SELF_TYPE' '{' '/* implementation */' '}' ';'
+    PROMPT_BOOL '(' ')' COLON BOOL '{' '/* implementation */' '}' ';' |
+    PROMPT_STRING '(' ')' COLON STRING_TYPE '{' '/* implementation */' '}' ';' |
+    PROMPT_INT '(' ')' COLON INT_TYPE '{' '/* implementation */' '}' ';' |
+    'printInt' '(' INT_TYPE ')' COLON 'SELF_TYPE' '{' '/* implementation */' '}' ';' |
+    'printString' '(' STRING_TYPE ')' COLON 'SELF_TYPE' '{' '/* implementation */' '}' ';'
 ;
 
 feature: 
     OBJECT_ID COLON TYPE_ID ';' |
-    OBJECT_ID LPAREN formals? RPAREN COLON TYPE_ID '{' statement* '}' ';'
+    OBJECT_ID '(' formalList? ')' COLON TYPE_ID '{' statement* '}' ';'
 ;
+
+formalList: formal (',' formal)*;
+formal: OBJECT_ID ':' TYPE_ID;
 
 statement: 
-    'if' expression 'then' statement 'else' statement |
-    'while' expression 'loop' statement 'pool' ';' |
-    '{' statement* '}' ';' |
-    expressionStatement ';' |
-    returnStatement ';'
+    'if' expression 'then' block 'else' block |
+    'while' expression 'loop' block 'pool' |
+    block |
+    assignment ';' |
+    methodCall ';' |
+    returnStatement
 ;
 
-expressionStatement: OBJECT_ID ASSIGN expression;
+block: '{' statement* '}';
 
-returnStatement: 'return' expression;
+returnStatement: 'return' expression ';';
 
-formals: formal (',' formal)*;
-formal: OBJECT_ID ':' TYPE_ID;
+expressionList: expression (',' expression)*;
 
 expression:
     INT |
@@ -40,29 +43,38 @@ expression:
     STRING_LITERAL |
     TRUE |
     FALSE |
-    OBJECT_ID '(' expression (',' expression)* ')' |
+    methodCall |
     expression ('*' | '/' | '+' | '-' | '<=' | '<' | '=') expression |
     '(' expression ')' |
     NOT expression |
     TILDE expression |
-    ioExpression |
     assignment
 ;
 
 assignment: OBJECT_ID ASSIGN expression;
 
-ioExpression:
-    OBJECT_ID '.' OBJECT_ID '(' expression? (',' expression)* ')' 
-;
+methodCall
+    :   OBJECT_ID '.' (ioMethodCall | userMethodCall) // Distinguish IO and user method calls
+    ;
+
+ioMethodCall
+    :   (PROMPT_BOOL | PROMPT_STRING | PROMPT_INT | 'printInt' | 'printString') '(' expressionList? ')' 
+    ;
+
+userMethodCall
+    :   OBJECT_ID '(' expressionList? ')' // User defined method calls
+    ;
 
 // Lexer rules
+PROMPT_BOOL: 'promptBool';
+PROMPT_STRING: 'promptString';
+PROMPT_INT: 'promptInt';
 CLASS: 'class';
 INHERITS: 'inherits';
 TRUE: 'true';
 FALSE: 'false';
 ISVOID: 'isvoid';
 NOT: 'not';
-OBJECT_ID: [a-z][a-zA-Z0-9_]*;
 TYPE_ID: [A-Z][a-zA-Z0-9_]*;
 STRING_LITERAL: '"' (~["\r\n\\] | '\\' ["\\/bfnrt])* '"';
 INT: [0-9]+;
@@ -79,3 +91,4 @@ SELF_TYPE: 'SELF_TYPE';
 BOOL: 'Bool';
 STRING_TYPE: 'String';
 INT_TYPE: 'Int';
+OBJECT_ID: [a-z][a-zA-Z0-9_]*; // El patrón original para los identificadores

@@ -9,19 +9,21 @@ class Main {
     };
 
     main(): String {
-        var1 <- io.promptBool("Ingrese un valor booleano (true/false):");
+        var1 <- io.promptBool(true);
         var2 <- io.promptString("Ingrese un texto:");
-        var3 <- io.promptInt("Ingrese el número x:");
+        var3 <- io.promptInt(20);
 
         if var1 then {
             var3 <- self.sum(5, 7, var3);
             io.printInt(var3);
         } else {
             var2 <- "intento";
-        };
+        }
 
         io.printString(var2);
         return var2;
     };
-}
+};
+
+
 
