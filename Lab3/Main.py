@@ -154,7 +154,12 @@ def execute_functions():
     global file_path
     global codigo_intermedio
 
-    input_stream = FileStream(file_path)
+    try:
+        input_stream = FileStream(file_path, encoding="latin1")
+    except Exception as e:
+        print(f"Error al leer el archivo: {e}")
+        print("Finalizando el programa debido a un error inesperado.")
+        return
 
     error_listener = CustomErrorListener()
 
@@ -178,53 +183,66 @@ def execute_functions():
     parser.removeErrorListeners()
     parser.addErrorListener(error_listener)
 
-    try:
-        tree = (
-            parser.program()
-        )  # Esto creará un árbol incluso si hay errores sintácticos.
+    # Analizamos el programa (esto puede generar errores sintácticos)
+    tree = parser.program()
 
-        # print(Trees.toStringTree(tree, None, parser))
+    if parser.getNumberOfSyntaxErrors() > 0:
+        print("\nSe detectaron los siguientes errores sintácticos:")
+        for error in error_listener.error_messages:
+            print(error)
+        print("Finalizando el programa debido a errores sintácticos.")
+        return
 
-        plot_tree(parser, tree)
+    # Si llegamos aquí, no hay errores léxicos ni sintácticos
+    print("Análisis léxico y sintáctico completado sin errores.")
 
-        # Camina por el árbol incluso si hay errores sintácticos
-        listener = MyYAPLListener()
-        walker = ParseTreeWalker()
-        walker.walk(listener, tree)
+    # try:
+    #     tree = (
+    #         parser.program()
+    #     )  # Esto creará un árbol incluso si hay errores sintácticos.
 
-        # Ahora, al final, verifica e imprime todos los errores detectados
-        if parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0:
-            print("Se detectaron los siguientes errores:")
+    #     # print(Trees.toStringTree(tree, None, parser))
 
-            for error in error_listener.error_messages:
-                print("Error Sintáctico: " + error)
+    #     plot_tree(parser, tree)
 
-            for error in listener.semantic_errors:
-                print("Error Semántico: " + error)
+    #     # Camina por el árbol incluso si hay errores sintácticos
+    #     listener = MyYAPLListener()
+    #     walker = ParseTreeWalker()
+    #     walker.walk(listener, tree)
 
-            print("Finalizando el programa.")
-            return
+    #     # Ahora, al final, verifica e imprime todos los errores detectados
+    #     if parser.getNumberOfSyntaxErrors() > 0 or len(listener.semantic_errors) > 0:
+    #         print("Se detectaron los siguientes errores:")
 
-        # Usando el Generador
-        generador = GeneradorCodigoIntermedio()
-        walker.walk(
-            generador, tree
-        )  # Utilizamos el walker con el GeneradorCodigoIntermedio
-        codigo_intermedio = generador.get_codigo_intermedio()
-        generador.imprimir_codigo_intermedio()
-        # Uso de la clase mips
-        translator = IntermediateToMIPS(listener.symbol_table)
-        mips_code = translator.generate_code(codigo_intermedio)  # 'your_intermediate_code' es el código intermedio que has proporcionado
-        translator.save_mips_to_file(mips_code, "mi_archivo_mips.txt")
+    #         for error in error_listener.error_messages:
+    #             print("Error Sintáctico: " + error)
 
-        # Guarda el código intermedio en un archivo
-        save_to_file(codigo_intermedio)
+    #         for error in listener.semantic_errors:
+    #             print("Error Semántico: " + error)
 
-    except Exception as e:  # Captura otras excepciones para asegurar una salida limpia
+    #         print("Finalizando el programa.")
+    #         return
 
-        # print(traceback.format_exc())
-        print(f"Error: {e}")
-        print("Finalizando el programa debido a un error inesperado.")
+        # # Usando el Generador
+        # generador = GeneradorCodigoIntermedio()
+        # walker.walk(
+        #     generador, tree
+        # )  # Utilizamos el walker con el GeneradorCodigoIntermedio
+        # codigo_intermedio = generador.get_codigo_intermedio()
+        # generador.imprimir_codigo_intermedio()
+        # # Uso de la clase mips
+        # translator = IntermediateToMIPS(listener.symbol_table)
+        # mips_code = translator.generate_code(codigo_intermedio)  # 'your_intermediate_code' es el código intermedio que has proporcionado
+        # translator.save_mips_to_file(mips_code, "mi_archivo_mips.txt")
+
+        # # Guarda el código intermedio en un archivo
+        # save_to_file(codigo_intermedio)
+
+    # except Exception as e:  # Captura otras excepciones para asegurar una salida limpia
+
+    #     print(f"Error: {e}")
+    #     traceback.print_exc()  # Imprime la traza completa del error
+    #     print("Finalizando el programa debido a un error inesperado.")
 
 
 # -------------------------------------Fin GUI------------------------------------
@@ -308,6 +326,12 @@ class CustomErrorListener(ErrorListener):
             error_msg = f"Linea {line}:{column} Error: token no reconocido 'String'"
         elif "extraneous input ';' expecting" in msg:
             error_msg = f"Linea {line}:{column} Error: Entrada inesperada ';', se esperaba '{{', '}}', 'if', 'while', 'return', o OBJECT_ID"
+        elif "no viable alternative at input 'IO.'" in msg:
+            error_msg = f"Linea {line}:{column} Error: Método de IO no definido o incorrecto"
+        elif "mismatched input" in msg and "expecting {'Int', 'String', 'Bool'}" in msg:
+            error_msg = f"Linea {line}:{column} Error: Tipo incorrecto para el método de IO"
+        elif "call to undefined function" in msg:
+            error_msg = f"Linea {line}:{column} Error: Llamada a función no definida en IO"
         else:
             error_msg = f"Linea {line}:{column} {msg}"
 
@@ -349,9 +373,9 @@ def plot_tree(parser, tree):
 
     root = build_node(tree)
 
-    # ---------Imprimir Arbol de analisis sintactico-------
-    # for pre, fill, node in RenderTree(root):
-    #     print("%s%s" % (pre, node.displayed_label))
+    #---------Imprimir Arbol de analisis sintactico-------
+    for pre, fill, node in RenderTree(root):
+        print("%s%s" % (pre, node.displayed_label))
 
     DotExporter(
         root,
