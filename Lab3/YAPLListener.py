@@ -26,6 +26,24 @@ class YAPLListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by YAPLParser#ioClassDef.
+    def enterIoClassDef(self, ctx:YAPLParser.IoClassDefContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#ioClassDef.
+    def exitIoClassDef(self, ctx:YAPLParser.IoClassDefContext):
+        pass
+
+
+    # Enter a parse tree produced by YAPLParser#ioFeature.
+    def enterIoFeature(self, ctx:YAPLParser.IoFeatureContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#ioFeature.
+    def exitIoFeature(self, ctx:YAPLParser.IoFeatureContext):
+        pass
+
+
     # Enter a parse tree produced by YAPLParser#feature.
     def enterFeature(self, ctx:YAPLParser.FeatureContext):
         pass
@@ -86,6 +104,24 @@ class YAPLListener(ParseTreeListener):
 
     # Exit a parse tree produced by YAPLParser#expression.
     def exitExpression(self, ctx:YAPLParser.ExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by YAPLParser#assignment.
+    def enterAssignment(self, ctx:YAPLParser.AssignmentContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#assignment.
+    def exitAssignment(self, ctx:YAPLParser.AssignmentContext):
+        pass
+
+
+    # Enter a parse tree produced by YAPLParser#ioExpression.
+    def enterIoExpression(self, ctx:YAPLParser.IoExpressionContext):
+        pass
+
+    # Exit a parse tree produced by YAPLParser#ioExpression.
+    def exitIoExpression(self, ctx:YAPLParser.IoExpressionContext):
         pass
 
 
