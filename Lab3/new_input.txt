@@ -1,0 +1,39 @@
+class Main {
+    var1: Bool;
+    var2: String;
+    var3: Int;
+    io: IO;
+
+    sum(a: Int, b: Int, c: Int): Int {
+        return a + b * c;
+    };
+
+    main(): String {
+        var1 <- io.promptBool(true);
+        var2 <- io.promptString("Ingrese un texto:");
+        var3 <- io.promptInt(20);
+
+        if var1 then{
+            var3 <- self.sum(5, 7, var3); }
+        else{
+            var2 <- "intento";}
+	return var2;
+
+        io.printString(var2);
+        
+    };
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+

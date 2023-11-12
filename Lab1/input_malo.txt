@@ -1,20 +1,29 @@
-class MainClass {
-    var1: Int; 
-    var2 String; 
-    mainMethod(arg1: Int, arg2: String): Int {
-        if var1 then
-            var2 <- "true branch"
-        else
-            var2 "false branch"; 
-        ; 
-        return 0
-    }; 
-class SecondClass inherits MainClass {
-    var3: Bool
-    secondMethod(): Int {
-        while var3 loop
-            var1 <- var1 + ; 
-        pool;
-        return var1;
-    }
+class Main {
+    var1: Bool;
+    var2: String;
+    var3: Int;
+    io: IO;
+
+    sum(a: Int, b: Int, c: Int): Int {
+        return a + b * c;
+    };
+
+    main(): String {
+        var1 <- io.promptBool("Ingrese un valor booleano (true/false): ");
+        var2 <- io.promptString("Ingrese un texto: ");
+        var3 <- io.promptInt("Ingrese el número x: ");
+
+        if var1 then {
+            var3 <- sum(5, 7, var3);
+            var2 <- io.printInt(var3);
+        }
+        else {
+            var2 <- "intento";
+        }
+        fi;
+
+        io.printString(var2);
+        return var2;
+    };
+};
 

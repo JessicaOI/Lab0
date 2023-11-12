@@ -1,0 +1,24 @@
+class Main {
+    main(): Object {
+        let x: Int <- IO.readInt();
+        let y: Int <- IO.readInt();
+        let z: Int <- self.calculate(x, y);
+        IO.printInt(z);
+        if z <= 0 then
+            IO.printString("El resultado es negativo.\n")
+        else
+            IO.printString("El resultado es positivo.\n")
+        fi;
+        while z > 0 loop
+            IO.printString("Iterando...\n");
+            z <- z - 1;
+        pool;
+        IO.printString("Fin del bucle.\n");
+        return z
+    };
+
+    calculate(a: Int, b: Int): Int {
+        let result: Int <- a + b * 2;
+        result
+    };
+};
