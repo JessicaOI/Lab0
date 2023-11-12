@@ -8,11 +8,17 @@ class Main {
     };
 
     main(): String {
-        if var1 then
-            var3 <- sum(5, 7, 9);
-        else
-            var2 <- "intento";
-        fi;
+        if var1 then{
+            var3 <- self.sum(5, 7, 9);}
+        else{
+            var2 <- "intento";}
         return var2;
     };
 };
+
+
+
+
+
+
+

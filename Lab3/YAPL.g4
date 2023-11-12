@@ -43,7 +43,9 @@ expression:
     TRUE |
     FALSE |
     methodCall |
-    expression ('*' | '/' | '+' | '-' | '<=' | '<' | '=') expression |
+    expression ('*' | '/') expression |
+    expression ('+' | '-') expression |
+    expression ('<=' | '<' | '=') expression |
     '(' expression ')' |
     NOT expression |
     TILDE expression |
