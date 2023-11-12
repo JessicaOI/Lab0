@@ -59,7 +59,7 @@ methodCall
     ;
 
 ioMethodCall
-    :   (PROMPT_BOOL | PROMPT_STRING | PROMPT_INT | 'printInt' | 'printString') '(' expressionList? ')' 
+    :   (PROMPT_BOOL | PROMPT_STRING | PROMPT_INT | 'printInt' | 'printString') '(' expression? ')' 
     ;
 
 userMethodCall
