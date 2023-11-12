@@ -197,12 +197,6 @@ def execute_functions():
     #print("Análisis léxico y sintáctico completado sin errores.")
 
     try:
-        tree = (
-            parser.program()
-        )  # Esto creará un árbol incluso si hay errores sintácticos.
-
-        # print(Trees.toStringTree(tree, None, parser))
-
         plot_tree(parser, tree)
 
         # Camina por el árbol incluso si hay errores sintácticos
@@ -671,6 +665,7 @@ class MyYAPLListener(YAPLListener):
         self.variable_values = {}  # Para inicializar variable_values
 
     def enterClassDef(self, ctx):
+        print("Hola")
         self.has_class = True
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
 
@@ -680,8 +675,8 @@ class MyYAPLListener(YAPLListener):
             )
             return
 
-        class_name = ctx.TYPE_ID()[0].getText()
-        self.current_scope = class_name  # Establecer current_scope una vez
+        class_name = type_ids[0].getText()  # Asegúrate de obtener el nombre de la clase correctamente
+        self.current_scope = class_name
 
         parent_class_name = None
         # Verificación de la clase Main
