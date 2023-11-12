@@ -1296,101 +1296,132 @@ class GeneradorCodigoIntermedio(YAPLListener):
         else:
             print(f"Skipping quadruple: {cuadruplo} - already exists.")
 
-    def process_statement_block(self, block_statement):
-        for expression_statement in block_statement.getTypedRuleContexts(
-            YAPLParser.UserMethodCallContext
-        ):
-            if expression_statement not in self.processed_statements:
-                self.processed_statements.add(expression_statement)
-                self.enterExpressionStatement(expression_statement)
-            else:
-                print(
-                    f"Skipping processed block statement: {expression_statement.getText()}"
-                )
-
     def enterStatement(self, ctx: YAPLParser.StatementContext):
-
-        # print(f"Attempting to enter statement: {ctx.getText()}")
-
-        # Si el statement ya fue procesado, lo omitimos
+        # Evitar el procesamiento repetido de statements
         if ctx in self.processed_statements:
-            # print(f"Skipping processed statement: {ctx.getText()}")
-            # Marcar el statement como procesado
-            self.processed_statements.add(ctx)
             return
+        self.processed_statements.add(ctx)
+
+        first_child = ctx.getChild(0).getText()
+
+        if first_child == "if":
+            # Procesar la condición y generar cuádruplos
+            condition = self.process_expression(ctx.expression())
+            label_else = self.new_label()
+            label_end = self.new_label()
+
+            self.add_cuadruplo(Cuadruplo("if_false", condition, None, label_else))
+            # Procesar el bloque 'then'
+            self.process_statement_block(ctx.block(0))
+
+            if self.has_else_block(ctx):
+                # Si hay un bloque 'else', saltar al final después del bloque 'then'
+                self.add_cuadruplo(Cuadruplo("goto", None, None, label_end))
+                # Iniciar el bloque 'else'
+                self.add_cuadruplo(Cuadruplo("label", label_else, "-", "-"))
+                # Procesar el bloque 'else'
+                self.process_statement_block(ctx.block(1))
+            
+            # Etiqueta de fin del if-else
+            self.add_cuadruplo(Cuadruplo("label", label_end, "-", "-"))
+
+        elif first_child == "while":
+            # Procesar la condición y generar cuádruplos para while
+            label_start = self.new_label()
+            label_end = self.new_label()
+
+            self.add_cuadruplo(Cuadruplo("label", label_start, "-", "-"))
+            condition = self.process_expression(ctx.expression())
+            self.add_cuadruplo(Cuadruplo("if_false", condition, None, label_end))
+
+            # Procesar el bloque del bucle while
+            self.process_statement_block(ctx.block(0))
+            self.add_cuadruplo(Cuadruplo("goto", label_start, "-", "-"))
+            self.add_cuadruplo(Cuadruplo("label", label_end, "-", "-"))
 
         else:
-            # Marcar el statement como procesado
-            self.processed_statements.add(ctx)
+            # Manejar otros tipos de statements, especialmente asignaciones
+            for assignment_context in ctx.getTypedRuleContexts(YAPLParser.AssignmentContext):
+                self.enterAssignment(assignment_context)
 
-            first_child = ctx.getChild(0).getText()
+    # Método auxiliar para procesar un bloque de statements
+    def process_statement_block(self, block_ctx):
+        for statement in block_ctx.statement():
+            self.enterStatement(statement)
 
-            if first_child == "if":
-                self.inside_block = True
+
+
+
+    def enterIoClassDef(self, ctx: YAPLParser.IoClassDefContext):
+        class_name = "IO"
+        self.enter_scope(class_name)
+        # Añadir cuádruplos específicos para iniciar la clase IO, si es necesario
+        # Por ejemplo, si hay alguna inicialización específica para la clase IO
+        self.add_cuadruplo(Cuadruplo("init_io_class", class_name, None, None))
+
+
+    def exitIoClassDef(self, ctx: YAPLParser.IoClassDefContext):
+        class_name = ctx.IO().getText()
+        self.exit_scope()
+        # Aquí, puedes manejar el fin de la definición de la clase IO
+
+    def enterIoFeature(self, ctx: YAPLParser.IoFeatureContext):
+        method_name = ctx.getChild(0).getText()  # Obtiene el nombre del método IO
+        # Aquí, podrías generar cuádruplos específicos para cada método IO
+        # Por ejemplo:
+        if method_name == "PROMPT_BOOL":
+            # Generar cuádruplos para leer un valor booleano del usuario
+            self.add_cuadruplo(Cuadruplo("input_bool", None, None, None))
+        elif method_name == "PROMPT_STRING":
+            # Análogamente para un string
+            self.add_cuadruplo(Cuadruplo("input_string", None, None, None))
+        # Continuar para otros métodos IO
+
+
+    def enterIoMethodCall(self, ctx: YAPLParser.IoMethodCallContext):
+        method_name = ctx.getChild(0).getText()
+        parent_ctx = ctx.parentCtx  # Se obtiene el contexto padre para obtener el identificador de asignación, si lo hay
+
+        # Se verifica si el contexto padre es una asignación
+        if isinstance(parent_ctx, YAPLParser.ExpressionContext) and parent_ctx.ASSIGN():
+            var_name = parent_ctx.OBJECT_ID().getText()  # Se obtiene el nombre de la variable a la que se asignará el resultado
+
+            if method_name in ["promptBool", "promptString", "promptInt"]:
                 temp = self.new_temp()
-                if self.is_temporary_in_use(temp):
-                    self.processed_temporaries.add(temp)
-                condition = self.process_expression(ctx.expression())
-                self.add_cuadruplo(Cuadruplo("=", condition, None, temp))
+                if method_name == "promptBool":
+                    self.add_cuadruplo(Cuadruplo("input_bool", None, None, temp))
+                elif method_name == "promptString":
+                    self.add_cuadruplo(Cuadruplo("input_string", None, None, temp))
+                elif method_name == "promptInt":
+                    self.add_cuadruplo(Cuadruplo("input_int", None, None, temp))
+                self.add_cuadruplo(Cuadruplo("assign", temp, None, var_name))
+            elif method_name in ["printInt", "printString"]:
+                argument = self.process_expression(ctx.expressionList().expression(0))
+                if method_name == "printInt":
+                    self.add_cuadruplo(Cuadruplo("print_int", argument, None, None))
+                elif method_name == "printString":
+                    self.add_cuadruplo(Cuadruplo("print_string", argument, None, None))
+        else:
+            # Manejo de otros casos o métodos IO que no son asignaciones
+            pass
 
-                label_else = self.new_label()
-                label_end = self.new_label()
-                self.add_cuadruplo(Cuadruplo("if_false", temp, None, label_else))
 
-                self.process_statement_block(ctx.block(0))
 
-                if self.has_else_block(ctx):
-                    self.add_cuadruplo(Cuadruplo("goto", None, None, label_end))
-                    self.add_cuadruplo(Cuadruplo("label", None, None, label_else))
-                    self.process_statement_block(ctx.block(1))
-                    self.add_cuadruplo(Cuadruplo("label", None, None, label_end))
+    
+    def enterUserMethodCall(self, ctx: YAPLParser.UserMethodCallContext):
+        method_name = ctx.OBJECT_ID().getText()
+        arguments = [self.process_expression(expr) for expr in ctx.expressionList().expression()]
+        self.add_cuadruplo(Cuadruplo("call_method", method_name, len(arguments), None))
+        for arg in arguments:
+            self.add_cuadruplo(Cuadruplo("param", arg, None, None))
 
-                self.inside_block = False
 
-            elif first_child == "while":
-                self.inside_block = True
-                label_start = self.new_label()
-                self.add_cuadruplo(Cuadruplo("label", None, None, label_start))
+    def enterAssignment(self, ctx: YAPLParser.AssignmentContext):
+        var_name = ctx.OBJECT_ID().getText()
+        value = self.process_expression(ctx.expression())
+        self.add_cuadruplo(Cuadruplo("assign", value, None, var_name))
 
-                temp = self.new_temp()
-                if self.is_temporary_in_use(temp):
-                    self.processed_temporaries.add(temp)
-                condition = self.process_expression(ctx.expression())
-                self.add_cuadruplo(Cuadruplo("=", condition, None, temp))
-
-                label_end = self.new_label()
-                self.add_cuadruplo(Cuadruplo("if_false", temp, None, label_end))
-
-                while_statement = ctx.block(0)
-                for expression_statement in while_statement.getTypedRuleContexts(
-                    YAPLParser.UserMethodCallContext
-                ):
-                    self.processed_statements.add(expression_statement)
-                    self.enterExpressionStatement(expression_statement)
-
-                self.add_cuadruplo(Cuadruplo("goto", None, None, label_start))
-                self.add_cuadruplo(Cuadruplo("label", None, None, label_end))
-
-                ctx.label_start = label_start
-                ctx.label_end = label_end
-
-                self.inside_block = False
-            else:
-                if not self.inside_block:
-                    if ctx in self.processed_statements:
-                        return
-                    for expression_statement in ctx.getTypedRuleContexts(
-                        YAPLParser.UserMethodCallContext
-                    ):
-                        self.enterExpressionStatement(expression_statement)
-
-            for statement in ctx.block():
-                self.processed_statements.add(statement)
-                for expression_statement in statement.getTypedRuleContexts(
-                    YAPLParser.UserMethodCallContext
-                ):
-                    self.processed_statements.add(expression_statement)
-
+    
     def process_expression(self, ctx: YAPLParser.ExpressionContext):
         operation = ctx.getText()
 
@@ -1455,6 +1486,8 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 f"{i:<15}{cuad.operador:<15}{cuad.arg1 if cuad.arg1 is not None else '':<15}"
                 f"{cuad.arg2 if cuad.arg2 is not None else '':<15}{cuad.destino if cuad.destino is not None else ''}"
             )
+
+
 
 
 # -------------------------Fin Generador codigo intermedio---------------------------------------------

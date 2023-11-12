@@ -1,6 +1,7 @@
 .data
 var1: .word 1
 var2: .asciiz ""
+var3: .word 0
 .text
 .globl main
 sum:
@@ -13,13 +14,13 @@ sum:
     jr $ra
     jr $ra
 main:
-    lw $t3, var1
-    sw $t3, $t3
-    lw $t3, $t3
-    beqz $t3, L1
+    lw var1, var1
+    beqz var1, L1
     j L2
-L1:
-L2:
+-:
+-:
+    li $a0, 5
+    li $a1, 7
     lw $v0, var2
     jr $ra
     jr $ra

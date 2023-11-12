@@ -14,8 +14,7 @@ class Main {
         var3 <- io.promptInt(20);
 
         if var1 then{
-            var3 <- self.sum(5, 7, var3);
-            io.printInt(var3);}
+            var3 <- self.sum(5, 7, var3); }
         else{
             var2 <- "intento";}
 	return var2;
@@ -24,6 +23,7 @@ class Main {
         
     };
 };
+
 
 
 
