@@ -1369,15 +1369,26 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
     def enterIoMethodCall(self, ctx: YAPLParser.IoMethodCallContext, var_name=None):
         method_name = ctx.getChild(0).getText()
+        argument = self.process_expression(ctx.expression())
 
-        if method_name in ["PROMPT_BOOL", "PROMPT_STRING", "PROMPT_INT"]:
-            # Argumento para el método IO (puede ser una cadena para el mensaje de prompt).
-            argument = self.process_expression(ctx.expression())
-            io_command = method_name.replace("PROMPT_", "").lower()
-            self.add_cuadruplo(Cuadruplo("call", f"io.{io_command}", argument, var_name))
+        if method_name in ["promptBool", "promptString", "promptInt"]:
+            # Si hay una variable asociada con la llamada (indicando una asignación), genera un cuádruplo 'call'.
+            if var_name is not None:
+                io_command = method_name[0].lower() + method_name[1:]  # "promptBool" a "promptbool"
+                self.add_cuadruplo(Cuadruplo("call", f"io.{io_command}", argument, var_name))
+        elif method_name == "printString":
+            # Cambio de 'print_string' a 'load_string' y agregado de 'syscall_print_string'.
+            self.add_cuadruplo(Cuadruplo("load_string", argument, "$a0", None))
+            self.add_cuadruplo(Cuadruplo("syscall_print_string", None, None, None))
+        elif method_name == "printInt":
+            # Cambio de 'print_int' a 'load_int' y agregado de 'syscall_print_int'.
+            self.add_cuadruplo(Cuadruplo("load_int", argument, "$a0", None))
+            self.add_cuadruplo(Cuadruplo("syscall_print_int", None, None, None))
         else:
-            # Si hay otros métodos IO que no son para entrada de datos, se manejarían aquí.
+            # Manejar otros posibles métodos IO si existen.
             pass
+
+
 
 
     def enterUserMethodCall(self, ctx: YAPLParser.UserMethodCallContext):
@@ -1390,10 +1401,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
 
     def enterAssignment(self, ctx: YAPLParser.AssignmentContext):
-        # Crear una clave única para cada statement basada en su posición y texto.
         statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
-        
-        # Verificar si el statement ya ha sido procesado.
         if statement_key in self.processed_statements:
             return
         self.processed_statements.add(statement_key)
@@ -1401,23 +1409,18 @@ class GeneradorCodigoIntermedio(YAPLListener):
         var_name = ctx.OBJECT_ID().getText()
         expr_ctx = ctx.expression()
 
-        # Verifica si la expresión contiene una llamada a método de IO.
+        # Verifica si la expresión contiene una llamada a método de IO para asignación.
         if isinstance(expr_ctx, YAPLParser.ExpressionContext) and expr_ctx.methodCall():
             method_call_ctx = expr_ctx.methodCall()
             if method_call_ctx.ioMethodCall():
                 io_method_call = method_call_ctx.ioMethodCall()
-                method_name = io_method_call.getChild(0).getText()
-                if method_name in ["promptBool", "promptString", "promptInt"]:
-                    # Procesar el argumento del método IO
-                    argument = self.process_expression(io_method_call.expression())
-                    io_command = method_name.lower()
-                    # Generar cuádruplo CALL
-                    self.add_cuadruplo(Cuadruplo("call", f"io.{io_command}", argument, var_name))
-                    return  # Finaliza este método para evitar procesar como asignación normal
+                self.enterIoMethodCall(io_method_call, var_name)
+                return  # Finaliza este método para evitar procesar como asignación normal.
 
         # Si no es una llamada a IO, procesa como una asignación normal.
         value = self.process_expression(expr_ctx)
         self.add_cuadruplo(Cuadruplo("assign", value, None, var_name))
+
 
 
 
