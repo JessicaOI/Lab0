@@ -1,16 +1,26 @@
 .data
 var1: .word 1
-var2: .asciiz ""
 var3: .word 0
+var4: .asciiz ""
+var2: .word 0
 .text
 .globl main
 sum:
-    lw $t0, b
-    lw $t1, c
-    mul $t1, $t0, $t1
-    lw $t2, a
-    add $t2, $t2, $t1
+    lw $t0, a
+    lw $t1, b
+    add $t1, $t0, $t1
+    lw $t2, c
+    add $t2, $t1, $t2
     lw $v0, $t2
+    jr $ra
+    jr $ra
+mul:
+    lw $t3, b
+    lw $t4, c
+    mul $t3, $t3, $t4
+    lw $t5, a
+    add $t4, $t5, $t3
+    lw $v0, $t4
     jr $ra
     jr $ra
 main:
@@ -21,6 +31,8 @@ main:
 -:
     li $a0, 5
     li $a1, 7
+    li $a3, 5
+    li $a4, 7
     lw $v0, var2
     jr $ra
     jr $ra

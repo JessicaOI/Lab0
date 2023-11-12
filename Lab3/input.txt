@@ -1,20 +1,34 @@
 class Main {
     var1: Bool;
-    var2: String;
+    var2: Int;
     var3: Int;
+    var4: String;
 
     sum(a: Int, b: Int, c: Int): Int {
+        return a + b + c;
+    };
+
+    mul(a: Int, b: Int, c: Int): Int {
         return a + b * c;
     };
 
-    main(): String {
+    main(): Int {
+
+        var1 <- io.promptBool("ingrese True para suma, ingrese false para multiplicacion: ");
+        var3 <- io.promptInt("Ingrese un numero: ");
+        var4 <- "El valor de la operacion es: ";
+
         if var1 then{
-            var3 <- self.sum(5, 7, 9);}
+            var2 <- self.sum(5, 7, var3);}
         else{
-            var2 <- "intento";}
+            var2 <- self.mul(5, 7, var3);}
         return var2;
+
+        io.printString(var4);
+        io.printInt(var2);
     };
 };
+
 
 
 
