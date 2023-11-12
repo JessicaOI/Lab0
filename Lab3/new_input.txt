@@ -13,17 +13,27 @@ class Main {
         var2 <- io.promptString("Ingrese un texto:");
         var3 <- io.promptInt(20);
 
-        if var1 then {
+        if var1 then{
             var3 <- self.sum(5, 7, var3);
-            io.printInt(var3);
-        } else {
-            var2 <- "intento";
-        }
+            io.printInt(var3);}
+        else{
+            var2 <- "intento";}
+	return var2;
 
         io.printString(var2);
-        return var2;
+        
     };
 };
+
+
+
+
+
+
+
+
+
+
 
 
 

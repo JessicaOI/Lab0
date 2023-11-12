@@ -771,7 +771,7 @@ class MyYAPLListener(YAPLListener):
         # Verificación para la clase Main y método main
         if class_name == "Main" and method_name == "main":
             self.main_method_in_main_found = True
-            formals = ctx.formals()
+            formals = ctx.formalList()
 
             if formals:
                 self.semantic_errors.append(
@@ -1018,7 +1018,7 @@ class MyYAPLListener(YAPLListener):
         # Si es un literal
         if expr_ctx.INT():
             return "Int"
-        elif expr_ctx.STRING():
+        elif expr_ctx.STRING_LITERAL():
             return "String"
         elif expr_ctx.TRUE() or expr_ctx.FALSE():
             return "Bool"
@@ -1337,12 +1337,12 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 label_end = self.new_label()
                 self.add_cuadruplo(Cuadruplo("if_false", temp, None, label_else))
 
-                self.process_statement_block(ctx.statement(0))
+                self.process_statement_block(ctx.block(0))
 
                 if self.has_else_block(ctx):
                     self.add_cuadruplo(Cuadruplo("goto", None, None, label_end))
                     self.add_cuadruplo(Cuadruplo("label", None, None, label_else))
-                    self.process_statement_block(ctx.statement(1))
+                    self.process_statement_block(ctx.block(1))
                     self.add_cuadruplo(Cuadruplo("label", None, None, label_end))
 
                 self.inside_block = False
@@ -1361,7 +1361,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 label_end = self.new_label()
                 self.add_cuadruplo(Cuadruplo("if_false", temp, None, label_end))
 
-                while_statement = ctx.statement(0)
+                while_statement = ctx.block(0)
                 for expression_statement in while_statement.getTypedRuleContexts(
                     YAPLParser.UserMethodCallContext
                 ):
@@ -1384,7 +1384,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
                     ):
                         self.enterExpressionStatement(expression_statement)
 
-            for statement in ctx.statement():
+            for statement in ctx.block():
                 self.processed_statements.add(statement)
                 for expression_statement in statement.getTypedRuleContexts(
                     YAPLParser.UserMethodCallContext

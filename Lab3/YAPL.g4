@@ -25,7 +25,6 @@ formal: OBJECT_ID ':' TYPE_ID;
 statement: 
     'if' expression 'then' block 'else' block |
     'while' expression 'loop' block 'pool' |
-    block |
     assignment ';' |
     methodCall ';' |
     returnStatement

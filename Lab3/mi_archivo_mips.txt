@@ -1,15 +1,14 @@
 .data
 var1: .word 1
-var3: .word 0
 var2: .asciiz ""
 .text
 .globl main
 sum:
-    lw $t0, b
-    lw $t1, c
-    mul $t1, $t0, $t1
-    lw $t2, a
-    add $t2, $t2, $t1
+    lw $t0, a
+    lw $t1, b
+    add $t1, $t0, $t1
+    lw $t2, c
+    mul $t2, $t1, $t2
     lw $v0, $t2
     jr $ra
     jr $ra
@@ -18,16 +17,8 @@ main:
     sw $t3, $t3
     lw $t3, $t3
     beqz $t3, L1
-    li $a0, 5
-    li $a1, 7
-    li $a2, 9
-    jal sum
-    sw $v0, $t4
-    sw $t4, var3
     j L2
 L1:
-    lw $t3, "intento"
-    sw $t3, var2
 L2:
     lw $v0, var2
     jr $ra
