@@ -22,55 +22,13 @@ class Main {
             var2 <- self.sum(5, 7, var3);}
         else{
             var2 <- self.mul(5, 7, var3);}
-        return var2;
+        
 
         io.printString(var4);
 	io.printString(var4);
         io.printInt(var2);
+
+	return var2;
     };
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
