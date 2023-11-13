@@ -26,13 +26,17 @@ mul:
 main:
     lw var1, var1
     beqz var1, L1
-    j L2
--:
--:
     li $a0, 5
     li $a1, 7
+    j L2
+-:
     li $a3, 5
     li $a4, 7
+-:
+    li $a6, 5
+    li $a7, 7
+    li $a9, 5
+    li $a10, 7
     lw $v0, var2
     jr $ra
     jr $ra

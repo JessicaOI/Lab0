@@ -1301,8 +1301,9 @@ class GeneradorCodigoIntermedio(YAPLListener):
             label_end = self.new_label()
 
             self.add_cuadruplo(Cuadruplo("if_false", condition, None, label_else))
+            
             # Procesar el bloque 'then'
-            self.process_statement_block(ctx.block(0))
+            self.process_statement_block(ctx.block(0),True)
 
             if self.has_else_block(ctx):
                 # Si hay un bloque 'else', saltar al final después del bloque 'then'
@@ -1310,7 +1311,10 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 # Iniciar el bloque 'else'
                 self.add_cuadruplo(Cuadruplo("label", label_else, "-", "-"))
                 # Procesar el bloque 'else'
-                self.process_statement_block(ctx.block(1))
+                self.process_statement_block(ctx.block(1),False)
+            else:
+                # Si no hay bloque 'else', solo agregar la etiqueta de 'else'
+                self.add_cuadruplo(Cuadruplo("label", label_else, "-", "-"))
             
             # Etiqueta de fin del if-else
             self.add_cuadruplo(Cuadruplo("label", label_end, "-", "-"))
@@ -1325,7 +1329,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.add_cuadruplo(Cuadruplo("if_false", condition, None, label_end))
 
             # Procesar el bloque del bucle while
-            self.process_statement_block(ctx.block(0))
+            #self.process_statement_block(ctx.block(0))
             self.add_cuadruplo(Cuadruplo("goto", label_start, "-", "-"))
             self.add_cuadruplo(Cuadruplo("label", label_end, "-", "-"))
 
@@ -1334,10 +1338,14 @@ class GeneradorCodigoIntermedio(YAPLListener):
             for assignment_context in ctx.getTypedRuleContexts(YAPLParser.AssignmentContext):
                 self.enterAssignment(assignment_context)
 
-    # Método auxiliar para procesar un bloque de statements
-    def process_statement_block(self, block_ctx):
+    
+    # Método auxiliar para procesar un bloque de statements, con un flag para saber si es 'then' o 'else'
+    def process_statement_block(self, block_ctx, is_then_block):
         for statement in block_ctx.statement():
-            self.enterStatement(statement)
+            if isinstance(statement, YAPLParser.AssignmentContext):
+                self.enterAssignment(statement, is_then_block)
+            else:
+                self.enterStatement(statement)
 
 
     def enterIoClassDef(self, ctx: YAPLParser.IoClassDefContext):
@@ -1390,16 +1398,17 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
 
 
-    def enterUserMethodCall(self, ctx: YAPLParser.UserMethodCallContext):
+    def enterUserMethodCall(self, ctx: YAPLParser.UserMethodCallContext, temp_var=None):
         method_name = ctx.OBJECT_ID().getText()
         arguments = [self.process_expression(expr) for expr in ctx.expressionList().expression()]
-        self.add_cuadruplo(Cuadruplo("call_method", method_name, len(arguments), None))
+        self.add_cuadruplo(Cuadruplo("call_method", method_name, len(arguments), temp_var))
         for arg in arguments:
             self.add_cuadruplo(Cuadruplo("param", arg, None, None))
+
             
 
 
-    def enterAssignment(self, ctx: YAPLParser.AssignmentContext):
+    def enterAssignment(self, ctx: YAPLParser.AssignmentContext, is_then_block=None):
         statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
         if statement_key in self.processed_statements:
             return
@@ -1407,6 +1416,20 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
         var_name = ctx.OBJECT_ID().getText()
         expr_ctx = ctx.expression()
+
+        # Verifica si la expresión es una llamada a método de usuario para evitar asignación directa.
+        if isinstance(expr_ctx, YAPLParser.ExpressionContext) and expr_ctx.methodCall():
+            method_call_ctx = expr_ctx.methodCall()
+            if method_call_ctx.userMethodCall():
+                temp_var = self.new_temp()  # Obtener una nueva variable temporal para el resultado
+                self.enterUserMethodCall(method_call_ctx.userMethodCall(), temp_var)  # Procesar la llamada al método
+                self.add_cuadruplo(Cuadruplo("assign", temp_var, None, var_name))  # Asignar el resultado a la variable
+                if is_then_block:
+                    label_end = self.new_label()
+                    self.add_cuadruplo(Cuadruplo("goto", None, None, label_end))
+                    self.add_cuadruplo(Cuadruplo("label", label_end, "-", "-"))
+                return  # Finaliza este método para evitar procesar como asignación normal
+
 
         # Verifica si la expresión contiene una llamada a método de IO para asignación.
         if isinstance(expr_ctx, YAPLParser.ExpressionContext) and expr_ctx.methodCall():
@@ -1416,10 +1439,9 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 self.enterIoMethodCall(io_method_call, var_name)
                 return  # Finaliza este método para evitar procesar como asignación normal.
 
-        # Si no es una llamada a IO, procesa como una asignación normal.
+        # Si no es una llamada a IO ni una llamada a método de usuario, procesa como una asignación normal.
         value = self.process_expression(expr_ctx)
         self.add_cuadruplo(Cuadruplo("assign", value, None, var_name))
-
 
 
 
