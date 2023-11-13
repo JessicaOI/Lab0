@@ -30,6 +30,8 @@ param var3 None None
 return var2 None None
 load_string var4 $a0 None
 syscall_print_string None None None
+load_string var4 $a0 None
+syscall_print_string None None None
 load_int var2 $a0 None
 syscall_print_int None None None
 end_method main - -

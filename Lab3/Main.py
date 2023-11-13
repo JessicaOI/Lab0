@@ -1264,16 +1264,6 @@ class GeneradorCodigoIntermedio(YAPLListener):
         value = self.process_expression(ctx.expression())
         self.add_cuadruplo(Cuadruplo("return", value, None, None))
 
-    def has_else_block(self, ctx):
-        return any(child.getText() == "else" for child in ctx.getChildren())
-
-    def is_else_block(self, ctx):
-        parent = ctx.parentCtx
-        return (
-            parent.getChildCount() > ctx.invokingState + 1
-            and parent.getChild(ctx.invokingState + 1).getText() == "else"
-        )
-
     def add_cuadruplo(self, cuadruplo: Cuadruplo):
         calling_function_name = inspect.stack()[1].function
         # print(f"In {calling_function_name}: Adding quadruple -> {cuadruplo}")
@@ -1284,6 +1274,17 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.cuadruplos.append(cuadruplo)
         else:
             print(f"Skipping quadruple: {cuadruplo} - already exists.")
+
+    def has_else_block(self, ctx):
+        return any(child.getText() == "else" for child in ctx.getChildren())
+
+    def is_else_block(self, ctx):
+        parent = ctx.parentCtx
+        return (
+            parent.getChildCount() > ctx.invokingState + 1
+            and parent.getChild(ctx.invokingState + 1).getText() == "else"
+        )
+
 
     def enterStatement(self, ctx: YAPLParser.StatementContext):
         # Evitar el procesamiento repetido de statements
@@ -1337,8 +1338,6 @@ class GeneradorCodigoIntermedio(YAPLListener):
     def process_statement_block(self, block_ctx):
         for statement in block_ctx.statement():
             self.enterStatement(statement)
-
-
 
 
     def enterIoClassDef(self, ctx: YAPLParser.IoClassDefContext):
