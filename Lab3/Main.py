@@ -1163,6 +1163,8 @@ class Cuadruplo:
         return f"{self.operador} {self.arg1} {self.arg2} {self.destino}"
 
 
+MAX_TEMP_REGISTERS = 10  # Asumiendo $t0-$t9
+
 class GeneradorCodigoIntermedio(YAPLListener):
     def __init__(self):
         self.temp_counter = 0
@@ -1182,17 +1184,33 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.processed_temporaries = set()
         self.processed_operations = set()
 
+    
     # Método para obtener una nueva variable temporal
     def new_temp(self):
-        if self.available_temporaries:
-            temp = self.available_temporaries.pop(0)
-            self.processed_temporaries.add(temp)
-            return temp
-        else:
-            self.temp_counter += 1
-            temp = f"$t{self.temp_counter}"
-            self.processed_temporaries.add(temp)
-            return temp
+        if not self.available_temporaries:
+            # Si no hay temporales disponibles, intenta liberar alguno
+            for temp in list(self.processed_temporaries):
+                self.release_temp(temp)
+                if self.available_temporaries:
+                    break  # Si se ha liberado un registro, sal del bucle
+            
+            if not self.available_temporaries:
+                if self.temp_counter < MAX_TEMP_REGISTERS - 1:
+                    # Si aún es posible, crea un nuevo temporal
+                    self.temp_counter += 1
+                    temp = f"$t{self.temp_counter}"
+                    self.processed_temporaries.add(temp)
+                    return temp
+                else:
+                    # Si has alcanzado el límite máximo de registros, maneja el "spill"
+                    raise Exception("No more temporary registers available, implement spilling logic")
+
+        # Si hay registros temporales disponibles, utilízalos
+        temp = self.available_temporaries.pop(0)
+        self.processed_temporaries.add(temp)
+        return temp
+
+
 
     def release_temp(self, temporary):
         if temporary.startswith("$t") and temporary in self.processed_temporaries:
@@ -1401,9 +1419,14 @@ class GeneradorCodigoIntermedio(YAPLListener):
     def enterUserMethodCall(self, ctx: YAPLParser.UserMethodCallContext, temp_var=None):
         method_name = ctx.OBJECT_ID().getText()
         arguments = [self.process_expression(expr) for expr in ctx.expressionList().expression()]
-        self.add_cuadruplo(Cuadruplo("call_method", method_name, len(arguments), temp_var))
+        
+        # Primero generar los cuádruplos para los parámetros
         for arg in arguments:
             self.add_cuadruplo(Cuadruplo("param", arg, None, None))
+        
+        # Luego generar el cuádruplo para invocar la función
+        self.add_cuadruplo(Cuadruplo("invoke_function", method_name, len(arguments), temp_var))
+
 
             
 
