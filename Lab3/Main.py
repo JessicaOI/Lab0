@@ -1565,13 +1565,14 @@ class IntermediateToMIPS():
         self.output_code = []
         self.data_section = []
         self.strings_counter = 0
-        self.variables = {}
         self.labels = set()
         self.stack_pointer_init_val = (
             10000  # Un valor arbitrario para el inicio de la pila.
         )
         self.strings = {}
         self.register_manager = RegisterManager()
+        self.ordered_variables = []  # Lista para mantener las variables en orden
+        self.string_variables = []
 
     def add_string_to_data(self, string, label=None):
         # Solo crea una etiqueta y agrega la cadena si se proporciona una etiqueta válida
@@ -1627,16 +1628,18 @@ class IntermediateToMIPS():
                     symbol = next((s for s in self.symbol_table.symbols if s.name == token), None)
                     if symbol:
                         declared_variables.add(token)  # Marcar la variable como declarada
+                        self.ordered_variables.append(token)  # Agregar la variable a la lista en orden
                         # Detectado símbolo y su tipo, procede según el tipo semántico
                         if symbol.symbol_type == SymbolType.VARIABLE:
                             if symbol.semantic_type == "Int":
                                 self.data_section.append(f"{token}: .word 0")
                             elif symbol.semantic_type == "String":
+                                self.string_variables.append(token)  # Agregar la variable a la lista de variables string
                                 string_value = variable_values.get(token, "")
                                 #self.data_section.append(f'{token}: .asciiz "{string_value}"')
                                 self.add_string_to_data(string_value,token)
                                 declared_variables.add(variable_name)
-                                print(variable_name)
+                                #print(variable_name)
                             elif symbol.semantic_type == "Bool":
                                 self.data_section.append(f"{token}: .word 1")  # True por defecto
                         # ... otros tipos de símbolos ...
@@ -1688,11 +1691,11 @@ class IntermediateToMIPS():
             return temp_reg
 
     def generate_code(self, intermediate_code):
+        
         self.detect_variables(intermediate_code)
         lines = intermediate_code.strip().split("\n")
         current_function = None
         param_index = 0  # Inicialización de param_index
-        variable_values = {} 
 
         for line in lines:
             tokens = line.split()
@@ -1704,9 +1707,9 @@ class IntermediateToMIPS():
             if cmd == "begin_method":
                 current_function = tokens[1]
                 self.output_code.append(f"{current_function}:")
-            elif cmd == "end_method":
-                self.output_code.append("    jr $ra")
-                current_function = None
+            # elif cmd == "end_method":
+            #     self.output_code.append("    jr $ra")
+            #     current_function = None
             elif cmd in ["+", "-", "*", "/"]:
                 # Determinar los operandos
                 reg1 = self.get_operand_register(tokens[1])
@@ -1721,12 +1724,12 @@ class IntermediateToMIPS():
                 else:
                     self.output_code.append(f"    {operation} {result_reg}, {reg1}, {reg2}")
             
-            elif cmd == "assign" and tokens[1].startswith('"'):
-                # Asignación de una cadena a una variable
-                string_value = tokens[1].strip('"') + '\\n'  # Elimina las comillas y añade el salto de línea
-                variable_name = tokens[3]
-                variable_values[variable_name] = string_value
-                print(variable_values)
+            # elif cmd == "assign" and tokens[1].startswith('"'):
+            #     # Asignación de una cadena a una variable
+            #     string_value = tokens[1].strip('"') + '\\n'  # Elimina las comillas y añade el salto de línea
+            #     variable_name = tokens[3]
+            #     variable_values[variable_name] = string_value
+            #     print('dentro odel assign:',variable_values)
 
             elif cmd == "=":
                 source_reg = (
@@ -1783,27 +1786,34 @@ class IntermediateToMIPS():
                     self.output_code.append(f"    sw $v0, {result_reg}")
 
             elif cmd == "syscall_print_string":
-                variable_name = tokens[1]
-                # Busca la etiqueta en la sección .data que corresponde a la variable
-                data_label = self.find_data_label_for_variable(variable_name)
-                self.output_code.append("    li $v0, 4")
-                self.output_code.append(f"    la $a0, {data_label}")
-                self.output_code.append("    syscall")
-                # if variable_name in self.data_section_labels:  # Asumiendo que data_section_labels es una lista de las etiquetas definidas en .data
-                #     # Usa la etiqueta directamente si ya está en la sección de datos.
-                #     self.output_code.append("    li $v0, 4")
-                #     self.output_code.append(f"    la $a0, {variable_name}")
-                #     self.output_code.append("    syscall")
-                # else:
-                #     # Si no, maneja el caso donde la cadena literal necesita ser agregada a .data y usada
-                #     string_label = self.add_string_to_data(variable_values[variable_name], variable_name)
-                #     self.output_code.append("    li $v0, 4")
-                #     self.output_code.append(f"    la $a0, {string_label}")
-                #     self.output_code.append("    syscall")
+                #print('variables dentro de syscall',self.ordered_variables)
+                # En lugar de buscar el nombre de la variable, usa la lista en orden
+                if self.string_variables:
+                    #print('variables dentro del ordered variables',self.ordered_variables)
+                    # Sacamos la primera variable en la lista
+                    next_variable = self.string_variables.pop(0)
+                    #print('next_variable:',next_variable)
+                    data_label = self.find_data_label_for_variable(next_variable)
+                    #print('data label:', data_label)
+                    # Load syscall number for print_str into $v0
+                    self.output_code.append("    li $v0, 4")
+                    # Load address of the string into $a0
+                    self.output_code.append(f"    la $a0, {data_label}")
+                     # Make syscall to print the string
+                    self.output_code.append("    syscall\n")
+                    # Load syscall number for exit into $v0
+                    self.output_code.append("    li $v0, 10")
+                    # Make syscall to exit the program
+                    self.output_code.append("    syscall\n")
+
+
+
+               
         # Después de procesar todas las líneas, generamos la sección de datos
-        for variable, value in variable_values.items():
-            # Agrega cada cadena al .data con su variable correspondiente como etiqueta
-            self.add_string_to_data(value, variable)
+        # for variable, value in variable_values.items():
+        #     # Agrega cada cadena al .data con su variable correspondiente como etiqueta
+        #     print('dentro del for del variable value>','value:',value,'variable:', variable )
+        #     self.add_string_to_data(value, variable)
 
         # # Luego, generamos el código de salida
         # for line in lines:

@@ -1,8 +1,7 @@
 begin_class Main - -
 begin_method main - -
+assign "hola" None var3
 assign "Hello World" None var4
-load_string var4 $a0 None
-syscall_print_string None None None
 load_string var4 $a0 None
 syscall_print_string None None None
 end_method main - -

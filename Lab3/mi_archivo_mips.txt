@@ -1,12 +1,12 @@
 .data
+var3: .asciiz "hola\n"
 var4: .asciiz "Hello World\n"
 .text
 .globl main
 main:
     li $v0, 4
-    la $a0, None
+    la $a0, var3
     syscall
-    li $v0, 4
-    la $a0, None
+
+    li $v0, 10
     syscall
-    jr $ra
