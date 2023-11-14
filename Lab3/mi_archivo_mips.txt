@@ -5,7 +5,7 @@ var4: .asciiz "Hello World\n"
 .globl main
 main:
     li $v0, 4
-    la $a0, var3
+    la $a0, var4
     syscall
 
     li $v0, 10

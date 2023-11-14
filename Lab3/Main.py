@@ -1696,6 +1696,7 @@ class IntermediateToMIPS():
         lines = intermediate_code.strip().split("\n")
         current_function = None
         param_index = 0  # Inicialización de param_index
+        current_string = None  # Variable para almacenar la última cadena cargada
 
         for line in lines:
             tokens = line.split()
@@ -1785,15 +1786,19 @@ class IntermediateToMIPS():
                 if result_reg != "None":
                     self.output_code.append(f"    sw $v0, {result_reg}")
 
+            elif cmd == "load_string":
+                current_string = tokens[1]  # Almacena la variable actual que contiene la cadena
+                print('current_string', current_string)
+
             elif cmd == "syscall_print_string":
                 #print('variables dentro de syscall',self.ordered_variables)
                 # En lugar de buscar el nombre de la variable, usa la lista en orden
-                if self.string_variables:
+                if current_string in self.string_variables:
                     #print('variables dentro del ordered variables',self.ordered_variables)
                     # Sacamos la primera variable en la lista
-                    next_variable = self.string_variables.pop(0)
+                    #next_variable = self.string_variables.pop(0)
                     #print('next_variable:',next_variable)
-                    data_label = self.find_data_label_for_variable(next_variable)
+                    data_label = self.find_data_label_for_variable(current_string)
                     #print('data label:', data_label)
                     # Load syscall number for print_str into $v0
                     self.output_code.append("    li $v0, 4")
@@ -1805,39 +1810,9 @@ class IntermediateToMIPS():
                     self.output_code.append("    li $v0, 10")
                     # Make syscall to exit the program
                     self.output_code.append("    syscall\n")
+                    # Reinicia current_string para evitar impresiones duplicadas
+                    current_string = None
 
-
-
-               
-        # Después de procesar todas las líneas, generamos la sección de datos
-        # for variable, value in variable_values.items():
-        #     # Agrega cada cadena al .data con su variable correspondiente como etiqueta
-        #     print('dentro del for del variable value>','value:',value,'variable:', variable )
-        #     self.add_string_to_data(value, variable)
-
-        # # Luego, generamos el código de salida
-        # for line in lines:
-        #     tokens = line.split()
-        #     if not tokens:
-        #         continue
-
-        #     cmd = tokens[0]
-
-        #     if cmd == "syscall_print_string":
-        #                     # Load syscall number for print_str into $v0
-        #                    # Load address of the string into $a0
-        #                    # Make syscall to print the string
-        #         string_label = variable_values[variable_name]
-        #         self.output_code.append("    li $v0, 4")
-        #         self.output_code.append(f"    la $a0, {string_label}")
-        #         self.output_code.append("    syscall")
-
-        #     elif cmd == "end_method" and current_function == "main":
-        #          # Load syscall number for exit into $v0
-        #          # Make syscall to exit the program
-        #         # Solo si estamos al final del método principal, agregamos la syscall de salida
-        #         self.output_code.append("    li $v0, 10")
-        #         self.output_code.append("    syscall")
 
         final_code = (
             ".data\n"
