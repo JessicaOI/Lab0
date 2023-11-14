@@ -1574,13 +1574,18 @@ class IntermediateToMIPS():
         self.register_manager = RegisterManager()
 
     def add_string_to_data(self, string, label=None):
-        # Crea un identificador único para la cadena si no se proporciona una etiqueta
-        if label is None:
-            label = f"str{self.strings_counter}"
-            self.strings_counter += 1
-        # Agrega la cadena a la sección de datos con la etiqueta
-        self.data_section.append(f'{label}: .asciiz "{string}"')
-        return label
+        # Solo crea una etiqueta y agrega la cadena si se proporciona una etiqueta válida
+        if label is not None and self.is_valid_variable_name(label):
+            # Agrega la cadena a la sección de datos con la etiqueta
+            self.data_section.append(f'{label}: .asciiz "{string}"')
+            return label
+        
+    def find_data_label_for_variable(self, variable_name):
+        # Busca en la sección .data la etiqueta correspondiente a la variable
+        for data_line in self.data_section:
+            if data_line.startswith(variable_name + ":"):
+                return variable_name  # Retorna la etiqueta si la encuentra
+        return None  # O maneja el caso en que la etiqueta no se encuentre
 
     def is_valid_variable_name(self, token):
         # Verifica si un token es un nombre de variable válido
@@ -1628,7 +1633,10 @@ class IntermediateToMIPS():
                                 self.data_section.append(f"{token}: .word 0")
                             elif symbol.semantic_type == "String":
                                 string_value = variable_values.get(token, "")
-                                self.data_section.append(f'{token}: .asciiz "{string_value}"')
+                                #self.data_section.append(f'{token}: .asciiz "{string_value}"')
+                                self.add_string_to_data(string_value,token)
+                                declared_variables.add(variable_name)
+                                print(variable_name)
                             elif symbol.semantic_type == "Bool":
                                 self.data_section.append(f"{token}: .word 1")  # True por defecto
                         # ... otros tipos de símbolos ...
@@ -1718,6 +1726,7 @@ class IntermediateToMIPS():
                 string_value = tokens[1].strip('"') + '\\n'  # Elimina las comillas y añade el salto de línea
                 variable_name = tokens[3]
                 variable_values[variable_name] = string_value
+                print(variable_values)
 
             elif cmd == "=":
                 source_reg = (
@@ -1772,34 +1781,53 @@ class IntermediateToMIPS():
                 result_reg = tokens[3]
                 if result_reg != "None":
                     self.output_code.append(f"    sw $v0, {result_reg}")
+
+            elif cmd == "syscall_print_string":
+                variable_name = tokens[1]
+                # Busca la etiqueta en la sección .data que corresponde a la variable
+                data_label = self.find_data_label_for_variable(variable_name)
+                self.output_code.append("    li $v0, 4")
+                self.output_code.append(f"    la $a0, {data_label}")
+                self.output_code.append("    syscall")
+                # if variable_name in self.data_section_labels:  # Asumiendo que data_section_labels es una lista de las etiquetas definidas en .data
+                #     # Usa la etiqueta directamente si ya está en la sección de datos.
+                #     self.output_code.append("    li $v0, 4")
+                #     self.output_code.append(f"    la $a0, {variable_name}")
+                #     self.output_code.append("    syscall")
+                # else:
+                #     # Si no, maneja el caso donde la cadena literal necesita ser agregada a .data y usada
+                #     string_label = self.add_string_to_data(variable_values[variable_name], variable_name)
+                #     self.output_code.append("    li $v0, 4")
+                #     self.output_code.append(f"    la $a0, {string_label}")
+                #     self.output_code.append("    syscall")
         # Después de procesar todas las líneas, generamos la sección de datos
         for variable, value in variable_values.items():
             # Agrega cada cadena al .data con su variable correspondiente como etiqueta
             self.add_string_to_data(value, variable)
 
-        # Luego, generamos el código de salida
-        for line in lines:
-            tokens = line.split()
-            if not tokens:
-                continue
+        # # Luego, generamos el código de salida
+        # for line in lines:
+        #     tokens = line.split()
+        #     if not tokens:
+        #         continue
 
-            cmd = tokens[0]
+        #     cmd = tokens[0]
 
-            if cmd == "syscall_print_string":
-                            # Load syscall number for print_str into $v0
-                           # Load address of the string into $a0
-                           # Make syscall to print the string
-                string_label = variable_values[variable_name]
-                self.output_code.append("    li $v0, 4")
-                self.output_code.append(f"    la $a0, {string_label}")
-                self.output_code.append("    syscall")
+        #     if cmd == "syscall_print_string":
+        #                     # Load syscall number for print_str into $v0
+        #                    # Load address of the string into $a0
+        #                    # Make syscall to print the string
+        #         string_label = variable_values[variable_name]
+        #         self.output_code.append("    li $v0, 4")
+        #         self.output_code.append(f"    la $a0, {string_label}")
+        #         self.output_code.append("    syscall")
 
-            elif cmd == "end_method" and current_function == "main":
-                 # Load syscall number for exit into $v0
-                 # Make syscall to exit the program
-                # Solo si estamos al final del método principal, agregamos la syscall de salida
-                self.output_code.append("    li $v0, 10")
-                self.output_code.append("    syscall")
+        #     elif cmd == "end_method" and current_function == "main":
+        #          # Load syscall number for exit into $v0
+        #          # Make syscall to exit the program
+        #         # Solo si estamos al final del método principal, agregamos la syscall de salida
+        #         self.output_code.append("    li $v0, 10")
+        #         self.output_code.append("    syscall")
 
         final_code = (
             ".data\n"
