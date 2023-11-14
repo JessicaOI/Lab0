@@ -1573,12 +1573,14 @@ class IntermediateToMIPS():
         self.strings = {}
         self.register_manager = RegisterManager()
 
-    def add_string_to_data(self, string):
-        # Esta función maneja la adición de cadenas a la sección .data
-        string_label = f"str{self.strings_counter}"
-        self.strings_counter += 1
-        self.data_section.append(f'{string_label}: .asciiz "{string}"')
-        return string_label
+    def add_string_to_data(self, string, label=None):
+        # Crea un identificador único para la cadena si no se proporciona una etiqueta
+        if label is None:
+            label = f"str{self.strings_counter}"
+            self.strings_counter += 1
+        # Agrega la cadena a la sección de datos con la etiqueta
+        self.data_section.append(f'{label}: .asciiz "{string}"')
+        return label
 
     def is_valid_variable_name(self, token):
         # Verifica si un token es un nombre de variable válido
@@ -1682,6 +1684,7 @@ class IntermediateToMIPS():
         lines = intermediate_code.strip().split("\n")
         current_function = None
         param_index = 0  # Inicialización de param_index
+        variable_values = {} 
 
         for line in lines:
             tokens = line.split()
@@ -1709,6 +1712,12 @@ class IntermediateToMIPS():
                     self.output_code.append(f"    mflo {result_reg}")
                 else:
                     self.output_code.append(f"    {operation} {result_reg}, {reg1}, {reg2}")
+            
+            elif cmd == "assign" and tokens[1].startswith('"'):
+                # Asignación de una cadena a una variable
+                string_value = tokens[1].strip('"') + '\\n'  # Elimina las comillas y añade el salto de línea
+                variable_name = tokens[3]
+                variable_values[variable_name] = string_value
 
             elif cmd == "=":
                 source_reg = (
@@ -1747,15 +1756,6 @@ class IntermediateToMIPS():
                     self.output_code.append(f"    lw $v0, {tokens[1]}")  # Load the variable into $v0
                 self.output_code.append("    jr $ra")
 
-            # elif cmd == "begin_method":
-            #     current_function = tokens[1]
-            #     self.output_code.append(f"{current_function}:")
-            #     param_index = 0
-
-            # elif cmd == "end_method":
-            #     self.output_code.append("    jr $ra")
-            #     current_function = None
-
             elif cmd == "param":
                 param = tokens[1]
                 register = f"$a{param_index}"
@@ -1772,7 +1772,34 @@ class IntermediateToMIPS():
                 result_reg = tokens[3]
                 if result_reg != "None":
                     self.output_code.append(f"    sw $v0, {result_reg}")
+        # Después de procesar todas las líneas, generamos la sección de datos
+        for variable, value in variable_values.items():
+            # Agrega cada cadena al .data con su variable correspondiente como etiqueta
+            self.add_string_to_data(value, variable)
 
+        # Luego, generamos el código de salida
+        for line in lines:
+            tokens = line.split()
+            if not tokens:
+                continue
+
+            cmd = tokens[0]
+
+            if cmd == "syscall_print_string":
+                            # Load syscall number for print_str into $v0
+                           # Load address of the string into $a0
+                           # Make syscall to print the string
+                string_label = variable_values[variable_name]
+                self.output_code.append("    li $v0, 4")
+                self.output_code.append(f"    la $a0, {string_label}")
+                self.output_code.append("    syscall")
+
+            elif cmd == "end_method" and current_function == "main":
+                 # Load syscall number for exit into $v0
+                 # Make syscall to exit the program
+                # Solo si estamos al final del método principal, agregamos la syscall de salida
+                self.output_code.append("    li $v0, 10")
+                self.output_code.append("    syscall")
 
         final_code = (
             ".data\n"
