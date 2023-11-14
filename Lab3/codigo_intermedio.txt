@@ -1,46 +1,9 @@
 begin_class Main - -
-begin_method sum - -
-+ a b $t1
-+ $t1 c $t1
-return $t1 None None
-end_method sum - -
-begin_method mul - -
-* b c $t2
-+ a $t2 $t2
-return $t2 None None
-end_method mul - -
 begin_method main - -
-call io.promptBool "ingrese True para suma, ingrese false para multiplicacion: " var1
-call io.promptInt "Ingrese un numero: " var3
-assign "El valor de la operacion es: " None var4
-if_false var1 None L1
-param 5 None None
-param 7 None None
-param var3 None None
-invoke_function sum 3 $t3
-assign $t3 None var2
-goto None None L2
-label L1 - -
-param 5 None None
-param 7 None None
-param var3 None None
-invoke_function mul 3 $t4
-assign $t4 None var2
-label L2 - -
-param 5 None None
-param 7 None None
-param var3 None None
-invoke_function sum 3 None
-param 5 None None
-param 7 None None
-param var3 None None
-invoke_function mul 3 None
+assign "Hello World" None var4
 load_string var4 $a0 None
 syscall_print_string None None None
 load_string var4 $a0 None
 syscall_print_string None None None
-load_int var2 $a0 None
-syscall_print_int None None None
-return var2 None None
 end_method main - -
 end_class Main - -

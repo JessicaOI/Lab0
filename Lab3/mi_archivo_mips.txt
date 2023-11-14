@@ -1,48 +1,6 @@
 .data
-var1: .word 1
-var3: .word 0
-var4: .asciiz ""
-var2: .word 0
+var4: .asciiz "Hello World\n"
 .text
 .globl main
-sum:
-    lw $t0, a
-    lw $t1, b
-    add $t1, $t0, $t1
-    lw $t2, c
-    add $t1, $t1, $t2
-    lw $v0, $t1
-    jr $ra
-    jr $ra
-mul:
-    lw $t3, b
-    lw $t4, c
-    mul $t2, $t3, $t4
-    lw $t5, a
-    add $t2, $t5, $t2
-    lw $v0, $t2
-    jr $ra
-    jr $ra
 main:
-    lw var1, var1
-    beqz var1, L1
-    li $a0, 5
-    li $a1, 7
-    jal sum
-    sw $v0, $t3
-    j L2
--:
-    li $a3, 5
-    li $a4, 7
-    jal mul
-    sw $v0, $t4
--:
-    li $a6, 5
-    li $a7, 7
-    jal sum
-    li $a9, 5
-    li $a10, 7
-    jal mul
-    lw $v0, var2
-    jr $ra
     jr $ra

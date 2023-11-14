@@ -1599,10 +1599,20 @@ class IntermediateToMIPS():
 
         lines = intermediate_code.strip().split("\n")
         declared_variables = set()
+        variable_values = {}  # Almacenar valores para las variables
 
         for line in lines:
             tokens = line.split()
-            
+
+            # Detectar asignaciones en el código intermedio
+            if tokens[0] == "assign" and len(tokens) > 3:
+                variable_name = tokens[-1]  # Usar el último token como el nombre de la variable
+                # Buscar una cadena de texto entre comillas
+                match = re.search(r'"([^"]*)"', line)
+                if match:
+                    string_value = match.group(1)
+                    variable_values[variable_name] = string_value.replace('_', ' ') + '\\n'
+
             for token in tokens:
                 # Solo considera tokens que son nombres de variables válidos
                 if self.is_valid_variable_name(token) and token not in declared_variables:
@@ -1615,7 +1625,8 @@ class IntermediateToMIPS():
                             if symbol.semantic_type == "Int":
                                 self.data_section.append(f"{token}: .word 0")
                             elif symbol.semantic_type == "String":
-                                self.data_section.append(f'{token}: .asciiz ""')
+                                string_value = variable_values.get(token, "")
+                                self.data_section.append(f'{token}: .asciiz "{string_value}"')
                             elif symbol.semantic_type == "Bool":
                                 self.data_section.append(f"{token}: .word 1")  # True por defecto
                         # ... otros tipos de símbolos ...
@@ -1623,10 +1634,6 @@ class IntermediateToMIPS():
                         #print(f"El símbolo no se encontró en la tabla de símbolos: {token}")
                         pass
 
-            # print("Contenido completo de la sección .data después de detect_variables:")
-            # for data in self.data_section:
-            #     print(data)
-            # print("\n")
 
 
     def push_to_stack(self, register):

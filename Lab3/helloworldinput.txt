@@ -1,0 +1,17 @@
+class Main{
+    io: IO;
+    var2: String;
+    var4: String;
+    main(): Int{
+        var4 <- "Hello World";
+        var2 <- io.printString(var4);
+    };
+};
+
+
+
+
+
+
+
+
