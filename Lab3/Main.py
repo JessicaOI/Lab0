@@ -1163,6 +1163,8 @@ class Cuadruplo:
         return f"{self.operador} {self.arg1} {self.arg2} {self.destino}"
 
 
+MAX_TEMP_REGISTERS = 10  # Asumiendo $t0-$t9
+
 class GeneradorCodigoIntermedio(YAPLListener):
     def __init__(self):
         self.temp_counter = 0
@@ -1181,18 +1183,36 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.available_temporaries = []
         self.processed_temporaries = set()
         self.processed_operations = set()
+        self.prompt_counter = 0
+        self.prompt_variables = {}
 
+    
     # Método para obtener una nueva variable temporal
     def new_temp(self):
-        if self.available_temporaries:
-            temp = self.available_temporaries.pop(0)
-            self.processed_temporaries.add(temp)
-            return temp
-        else:
-            self.temp_counter += 1
-            temp = f"$t{self.temp_counter}"
-            self.processed_temporaries.add(temp)
-            return temp
+        if not self.available_temporaries:
+            # Si no hay temporales disponibles, intenta liberar alguno
+            for temp in list(self.processed_temporaries):
+                self.release_temp(temp)
+                if self.available_temporaries:
+                    break  # Si se ha liberado un registro, sal del bucle
+            
+            if not self.available_temporaries:
+                if self.temp_counter < MAX_TEMP_REGISTERS - 1:
+                    # Si aún es posible, crea un nuevo temporal
+                    self.temp_counter += 1
+                    temp = f"$t{self.temp_counter}"
+                    self.processed_temporaries.add(temp)
+                    return temp
+                else:
+                    # Si has alcanzado el límite máximo de registros, maneja el "spill"
+                    raise Exception("No more temporary registers available, implement spilling logic")
+
+        # Si hay registros temporales disponibles, utilízalos
+        temp = self.available_temporaries.pop(0)
+        self.processed_temporaries.add(temp)
+        return temp
+
+
 
     def release_temp(self, temporary):
         if temporary.startswith("$t") and temporary in self.processed_temporaries:
@@ -1260,30 +1280,9 @@ class GeneradorCodigoIntermedio(YAPLListener):
             # Liberar la variable temporal utilizada en esta expresión, si es aplicable.
             self.release_temp(value)
 
-    # def exitExpressionStatement(self, ctx: YAPLParser.UserMethodCallContext):
-    #     statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
-
-    #     if statement_key not in self.processed_statements:
-    #         var_name = ctx.OBJECT_ID().getText()
-    #         value = self.process_expression(ctx.expression())
-    #         self.add_cuadruplo(Cuadruplo("=", value, None, var_name))
-    #         self.processed_statements.add(statement_key)
-    #         # Liberar la variable temporal utilizada en esta expresión
-    #         self.release_temp(value)
-
     def enterReturnStatement(self, ctx: YAPLParser.ReturnStatementContext):
         value = self.process_expression(ctx.expression())
         self.add_cuadruplo(Cuadruplo("return", value, None, None))
-
-    def has_else_block(self, ctx):
-        return any(child.getText() == "else" for child in ctx.getChildren())
-
-    def is_else_block(self, ctx):
-        parent = ctx.parentCtx
-        return (
-            parent.getChildCount() > ctx.invokingState + 1
-            and parent.getChild(ctx.invokingState + 1).getText() == "else"
-        )
 
     def add_cuadruplo(self, cuadruplo: Cuadruplo):
         calling_function_name = inspect.stack()[1].function
@@ -1295,6 +1294,17 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.cuadruplos.append(cuadruplo)
         else:
             print(f"Skipping quadruple: {cuadruplo} - already exists.")
+
+    def has_else_block(self, ctx):
+        return any(child.getText() == "else" for child in ctx.getChildren())
+
+    def is_else_block(self, ctx):
+        parent = ctx.parentCtx
+        return (
+            parent.getChildCount() > ctx.invokingState + 1
+            and parent.getChild(ctx.invokingState + 1).getText() == "else"
+        )
+
 
     def enterStatement(self, ctx: YAPLParser.StatementContext):
         # Evitar el procesamiento repetido de statements
@@ -1311,8 +1321,9 @@ class GeneradorCodigoIntermedio(YAPLListener):
             label_end = self.new_label()
 
             self.add_cuadruplo(Cuadruplo("if_false", condition, None, label_else))
+            
             # Procesar el bloque 'then'
-            self.process_statement_block(ctx.block(0))
+            self.process_statement_block(ctx.block(0),True)
 
             if self.has_else_block(ctx):
                 # Si hay un bloque 'else', saltar al final después del bloque 'then'
@@ -1320,7 +1331,10 @@ class GeneradorCodigoIntermedio(YAPLListener):
                 # Iniciar el bloque 'else'
                 self.add_cuadruplo(Cuadruplo("label", label_else, "-", "-"))
                 # Procesar el bloque 'else'
-                self.process_statement_block(ctx.block(1))
+                self.process_statement_block(ctx.block(1),False)
+            else:
+                # Si no hay bloque 'else', solo agregar la etiqueta de 'else'
+                self.add_cuadruplo(Cuadruplo("label", label_else, "-", "-"))
             
             # Etiqueta de fin del if-else
             self.add_cuadruplo(Cuadruplo("label", label_end, "-", "-"))
@@ -1335,7 +1349,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
             self.add_cuadruplo(Cuadruplo("if_false", condition, None, label_end))
 
             # Procesar el bloque del bucle while
-            self.process_statement_block(ctx.block(0))
+            #self.process_statement_block(ctx.block(0))
             self.add_cuadruplo(Cuadruplo("goto", label_start, "-", "-"))
             self.add_cuadruplo(Cuadruplo("label", label_end, "-", "-"))
 
@@ -1344,12 +1358,14 @@ class GeneradorCodigoIntermedio(YAPLListener):
             for assignment_context in ctx.getTypedRuleContexts(YAPLParser.AssignmentContext):
                 self.enterAssignment(assignment_context)
 
-    # Método auxiliar para procesar un bloque de statements
-    def process_statement_block(self, block_ctx):
+    
+    # Método auxiliar para procesar un bloque de statements, con un flag para saber si es 'then' o 'else'
+    def process_statement_block(self, block_ctx, is_then_block):
         for statement in block_ctx.statement():
-            self.enterStatement(statement)
-
-
+            if isinstance(statement, YAPLParser.AssignmentContext):
+                self.enterAssignment(statement, is_then_block)
+            else:
+                self.enterStatement(statement)
 
 
     def enterIoClassDef(self, ctx: YAPLParser.IoClassDefContext):
@@ -1378,48 +1394,112 @@ class GeneradorCodigoIntermedio(YAPLListener):
         # Continuar para otros métodos IO
 
 
-    def enterIoMethodCall(self, ctx: YAPLParser.IoMethodCallContext):
+    def enterIoMethodCall(self, ctx: YAPLParser.IoMethodCallContext, var_name=None):
         method_name = ctx.getChild(0).getText()
-        parent_ctx = ctx.parentCtx  # Se obtiene el contexto padre para obtener el identificador de asignación, si lo hay
+        argument = self.process_expression(ctx.expression())
+        print('method_name ',method_name)
+        print('argument ',argument)
 
-        # Se verifica si el contexto padre es una asignación
-        if isinstance(parent_ctx, YAPLParser.ExpressionContext) and parent_ctx.ASSIGN():
-            var_name = parent_ctx.OBJECT_ID().getText()  # Se obtiene el nombre de la variable a la que se asignará el resultado
+        if method_name in ["promptBool", "promptString", "promptInt"]:
+            temp_reg = self.new_temp()
 
-            if method_name in ["promptBool", "promptString", "promptInt"]:
-                temp = self.new_temp()
-                if method_name == "promptBool":
-                    self.add_cuadruplo(Cuadruplo("input_bool", None, None, temp))
-                elif method_name == "promptString":
-                    self.add_cuadruplo(Cuadruplo("input_string", None, None, temp))
-                elif method_name == "promptInt":
-                    self.add_cuadruplo(Cuadruplo("input_int", None, None, temp))
-                self.add_cuadruplo(Cuadruplo("assign", temp, None, var_name))
-            elif method_name in ["printInt", "printString"]:
-                argument = self.process_expression(ctx.expressionList().expression(0))
-                if method_name == "printInt":
-                    self.add_cuadruplo(Cuadruplo("print_int", argument, None, None))
-                elif method_name == "printString":
-                    self.add_cuadruplo(Cuadruplo("print_string", argument, None, None))
+            # Revisar si el argumento es una cadena literal
+            if argument.startswith('"') and argument.endswith('"'):
+                if argument not in self.prompt_variables:
+                    # Asignar la cadena a una nueva variable 'prompt' si aún no existe
+                    prompt_var = f"prompt{self.prompt_counter}"
+                    self.prompt_counter += 1
+                    self.prompt_variables[argument] = prompt_var
+                    self.add_cuadruplo(Cuadruplo("assign", argument, None, prompt_var))
+                else:
+                    # Reutilizar la variable 'prompt' existente
+                    prompt_var = self.prompt_variables[argument]
+
+                argument = prompt_var
+
+            # Realizar la syscall adecuada para la entrada
+            if method_name == "promptInt":
+                self.add_cuadruplo(Cuadruplo("load_int", argument, "$a0", None))
+                self.add_cuadruplo(Cuadruplo("syscall_print_int", None, None, None))
+                self.add_cuadruplo(Cuadruplo("move", "$v0", temp_reg, None))
+            elif method_name == "promptString":
+                self.add_cuadruplo(Cuadruplo("syscall_read_string", None, None, None))
+                self.add_cuadruplo(Cuadruplo("move", "input_buffer", temp_reg, None))
+            elif method_name == "promptBool":
+                self.add_cuadruplo(Cuadruplo("load_int", argument, "$a0", None))
+                self.add_cuadruplo(Cuadruplo("syscall_print_int", None, None, None))
+                self.add_cuadruplo(Cuadruplo("move", "$v0", temp_reg, None))
+
+            # Si hay una variable asociada con la llamada (indicando una asignación)
+            if var_name is not None:
+                self.add_cuadruplo(Cuadruplo("move", temp_reg, var_name, None))
+                self.release_temp(temp_reg)
+        elif method_name == "printString":
+            # Cambio de 'print_string' a 'load_string' y agregado de 'syscall_print_string'.
+            self.add_cuadruplo(Cuadruplo("load_string", argument, "$a0", None))
+            self.add_cuadruplo(Cuadruplo("syscall_print_string", None, None, None))
+        elif method_name == "printInt":
+            # Cambio de 'print_int' a 'load_int' y agregado de 'syscall_print_int'.
+            self.add_cuadruplo(Cuadruplo("load_int", argument, "$a0", None))
+            self.add_cuadruplo(Cuadruplo("syscall_print_int", None, None, None))
         else:
-            # Manejo de otros casos o métodos IO que no son asignaciones
+            # Manejar otros posibles métodos IO si existen.
             pass
 
 
 
-    
-    def enterUserMethodCall(self, ctx: YAPLParser.UserMethodCallContext):
+
+    def enterUserMethodCall(self, ctx: YAPLParser.UserMethodCallContext, temp_var=None):
         method_name = ctx.OBJECT_ID().getText()
         arguments = [self.process_expression(expr) for expr in ctx.expressionList().expression()]
-        self.add_cuadruplo(Cuadruplo("call_method", method_name, len(arguments), None))
+        
+        # Primero generar los cuádruplos para los parámetros
         for arg in arguments:
             self.add_cuadruplo(Cuadruplo("param", arg, None, None))
+        
+        # Luego generar el cuádruplo para invocar la función
+        self.add_cuadruplo(Cuadruplo("invoke_function", method_name, len(arguments), temp_var))
 
 
-    def enterAssignment(self, ctx: YAPLParser.AssignmentContext):
+            
+
+
+    def enterAssignment(self, ctx: YAPLParser.AssignmentContext, is_then_block=None):
+        statement_key = (ctx.start.line, ctx.start.column, ctx.getText())
+        if statement_key in self.processed_statements:
+            return
+        self.processed_statements.add(statement_key)
+
         var_name = ctx.OBJECT_ID().getText()
-        value = self.process_expression(ctx.expression())
+        expr_ctx = ctx.expression()
+
+        # Verifica si la expresión es una llamada a método de usuario para evitar asignación directa.
+        if isinstance(expr_ctx, YAPLParser.ExpressionContext) and expr_ctx.methodCall():
+            method_call_ctx = expr_ctx.methodCall()
+            if method_call_ctx.userMethodCall():
+                temp_var = self.new_temp()  # Obtener una nueva variable temporal para el resultado
+                self.enterUserMethodCall(method_call_ctx.userMethodCall(), temp_var)  # Procesar la llamada al método
+                self.add_cuadruplo(Cuadruplo("assign", temp_var, None, var_name))  # Asignar el resultado a la variable
+                if is_then_block:
+                    label_end = self.new_label()
+                    self.add_cuadruplo(Cuadruplo("goto", None, None, label_end))
+                    self.add_cuadruplo(Cuadruplo("label", label_end, "-", "-"))
+                return  # Finaliza este método para evitar procesar como asignación normal
+
+
+        # Verifica si la expresión contiene una llamada a método de IO para asignación.
+        if isinstance(expr_ctx, YAPLParser.ExpressionContext) and expr_ctx.methodCall():
+            method_call_ctx = expr_ctx.methodCall()
+            if method_call_ctx.ioMethodCall():
+                io_method_call = method_call_ctx.ioMethodCall()
+                self.enterIoMethodCall(io_method_call, var_name)
+                return  # Finaliza este método para evitar procesar como asignación normal.
+
+        # Si no es una llamada a IO ni una llamada a método de usuario, procesa como una asignación normal.
+        value = self.process_expression(expr_ctx)
         self.add_cuadruplo(Cuadruplo("assign", value, None, var_name))
+
+
 
     
     def process_expression(self, ctx: YAPLParser.ExpressionContext):
@@ -1518,20 +1598,29 @@ class IntermediateToMIPS():
         self.output_code = []
         self.data_section = []
         self.strings_counter = 0
-        self.variables = {}
         self.labels = set()
         self.stack_pointer_init_val = (
             10000  # Un valor arbitrario para el inicio de la pila.
         )
         self.strings = {}
         self.register_manager = RegisterManager()
+        self.ordered_variables = []  # Lista para mantener las variables en orden
+        self.string_variables = []
+        self.integer_variables = []
 
-    def add_string_to_data(self, string):
-        # Esta función maneja la adición de cadenas a la sección .data
-        string_label = f"str{self.strings_counter}"
-        self.strings_counter += 1
-        self.data_section.append(f'{string_label}: .asciiz "{string}"')
-        return string_label
+    def add_string_to_data(self, string, label=None):
+        # Solo crea una etiqueta y agrega la cadena si se proporciona una etiqueta válida
+        if label is not None and self.is_valid_variable_name(label):
+            # Agrega la cadena a la sección de datos con la etiqueta
+            self.data_section.append(f'{label}: .asciiz "{string}"')
+            return label
+        
+    def find_data_label_for_variable(self, variable_name):
+        # Busca en la sección .data la etiqueta correspondiente a la variable
+        for data_line in self.data_section:
+            if data_line.startswith(variable_name + ":"):
+                return variable_name  # Retorna la etiqueta si la encuentra
+        return None  # O maneja el caso en que la etiqueta no se encuentre
 
     def is_valid_variable_name(self, token):
         # Verifica si un token es un nombre de variable válido
@@ -1552,23 +1641,47 @@ class IntermediateToMIPS():
 
         lines = intermediate_code.strip().split("\n")
         declared_variables = set()
+        variable_values = {}  # Almacenar valores para las variables
 
         for line in lines:
             tokens = line.split()
-            
+
+            # Detectar asignaciones en el código intermedio
+            if tokens[0] == "assign" and len(tokens) > 3:
+                variable_name = tokens[-1]  # Usar el último token como el nombre de la variable
+                # Buscar una cadena de texto entre comillas
+                match = re.search(r'"([^"]*)"', line)
+                if match:
+                    string_value = match.group(1)
+                    variable_values[variable_name] = string_value.replace('_', ' ') + '\\n'
+
             for token in tokens:
                 # Solo considera tokens que son nombres de variables válidos
                 if self.is_valid_variable_name(token) and token not in declared_variables:
+                    # Verificar si el token es una variable "prompt"
+                    if token.startswith("prompt") and token[len("prompt"):].isdigit():
+                        # Si es una variable "prompt", manejar como una nueva variable string
+                        string_value = variable_values.get(token, "")
+                        self.add_string_to_data(string_value, token)
+                        declared_variables.add(token)
                     # Buscar el símbolo en la tabla de símbolos para obtener el tipo
                     symbol = next((s for s in self.symbol_table.symbols if s.name == token), None)
                     if symbol:
                         declared_variables.add(token)  # Marcar la variable como declarada
+                        self.ordered_variables.append(token)  # Agregar la variable a la lista en orden
                         # Detectado símbolo y su tipo, procede según el tipo semántico
                         if symbol.symbol_type == SymbolType.VARIABLE:
                             if symbol.semantic_type == "Int":
                                 self.data_section.append(f"{token}: .word 0")
+                                self.integer_variables.append(token)
                             elif symbol.semantic_type == "String":
-                                self.data_section.append(f'{token}: .asciiz ""')
+                                self.string_variables.append(token)  # Agregar la variable a la lista de variables string
+                                #print('variables que se van agregando al array:',self.string_variables)
+                                string_value = variable_values.get(token, "")
+                                #self.data_section.append(f'{token}: .asciiz "{string_value}"')
+                                self.add_string_to_data(string_value,token)
+                                declared_variables.add(variable_name)
+                                #print(variable_name)
                             elif symbol.semantic_type == "Bool":
                                 self.data_section.append(f"{token}: .word 1")  # True por defecto
                         # ... otros tipos de símbolos ...
@@ -1576,10 +1689,6 @@ class IntermediateToMIPS():
                         #print(f"El símbolo no se encontró en la tabla de símbolos: {token}")
                         pass
 
-            # print("Contenido completo de la sección .data después de detect_variables:")
-            # for data in self.data_section:
-            #     print(data)
-            # print("\n")
 
 
     def push_to_stack(self, register):
@@ -1624,10 +1733,13 @@ class IntermediateToMIPS():
             return temp_reg
 
     def generate_code(self, intermediate_code):
+        
         self.detect_variables(intermediate_code)
         lines = intermediate_code.strip().split("\n")
         current_function = None
         param_index = 0  # Inicialización de param_index
+        current_string = None  # Variable para almacenar la última cadena cargada
+        current_int = None  # Variable para almacenar la última cadena cargada
 
         for line in lines:
             tokens = line.split()
@@ -1639,9 +1751,9 @@ class IntermediateToMIPS():
             if cmd == "begin_method":
                 current_function = tokens[1]
                 self.output_code.append(f"{current_function}:")
-            elif cmd == "end_method":
-                self.output_code.append("    jr $ra")
-                current_function = None
+            # elif cmd == "end_method":
+            #     self.output_code.append("    jr $ra")
+            #     current_function = None
             elif cmd in ["+", "-", "*", "/"]:
                 # Determinar los operandos
                 reg1 = self.get_operand_register(tokens[1])
@@ -1655,6 +1767,13 @@ class IntermediateToMIPS():
                     self.output_code.append(f"    mflo {result_reg}")
                 else:
                     self.output_code.append(f"    {operation} {result_reg}, {reg1}, {reg2}")
+            
+            # elif cmd == "assign" and tokens[1].startswith('"'):
+            #     # Asignación de una cadena a una variable
+            #     string_value = tokens[1].strip('"') + '\\n'  # Elimina las comillas y añade el salto de línea
+            #     variable_name = tokens[3]
+            #     variable_values[variable_name] = string_value
+            #     print('dentro odel assign:',variable_values)
 
             elif cmd == "=":
                 source_reg = (
@@ -1693,15 +1812,6 @@ class IntermediateToMIPS():
                     self.output_code.append(f"    lw $v0, {tokens[1]}")  # Load the variable into $v0
                 self.output_code.append("    jr $ra")
 
-            # elif cmd == "begin_method":
-            #     current_function = tokens[1]
-            #     self.output_code.append(f"{current_function}:")
-            #     param_index = 0
-
-            # elif cmd == "end_method":
-            #     self.output_code.append("    jr $ra")
-            #     current_function = None
-
             elif cmd == "param":
                 param = tokens[1]
                 register = f"$a{param_index}"
@@ -1719,6 +1829,51 @@ class IntermediateToMIPS():
                 if result_reg != "None":
                     self.output_code.append(f"    sw $v0, {result_reg}")
 
+            elif cmd == "load_string":
+                current_string = tokens[1]  # Almacena la variable actual que contiene la cadena
+                #print('current_string', current_string)
+
+            elif cmd == "load_int":
+                current_int = tokens[1]  # Almacena la variable actual que contiene el int a imprimir
+
+            elif cmd == "syscall_print_string":
+                #print('variables dentro de syscall',self.ordered_variables)
+                # En lugar de buscar el nombre de la variable, usa la lista en orden
+                #print('string_variables',self.string_variables)
+                if current_string in self.string_variables:
+                    #print('variables dentro del ordered variables',self.ordered_variables)
+                    # Sacamos la primera variable en la lista
+                    #next_variable = self.string_variables.pop(0)
+                    #print('next_variable:',next_variable)
+                    data_label = self.find_data_label_for_variable(current_string)
+                    #print('data label:', data_label)
+                    # Load syscall number for print_str into $v0
+                    self.output_code.append("    li $v0, 4")
+                    # Load address of the string into $a0
+                    self.output_code.append(f"    la $a0, {data_label}")
+                     # Make syscall to print the string
+                    self.output_code.append("    syscall\n")
+                    # Reinicia current_string para evitar impresiones duplicadas
+                    current_string = None
+
+            elif cmd == "syscall_print_int":
+                #print('integer_variables',self.integer_variables)
+                if current_int in self.integer_variables:
+                    data_label = self.find_data_label_for_variable(current_int)
+                    # Load syscall number for print_int into $v0
+                    self.output_code.append("    li $v0, 1")
+                    # Load the integer value into $a0
+                    self.output_code.append(f"    lw $a0, {data_label}")
+                    # Make syscall to print the integer
+                    self.output_code.append("    syscall\n")
+                    # Agrega un salto de línea después de imprimir el entero
+                    self.output_code.append("    li $v0, 11")  # Syscall para imprimir carácter
+                    self.output_code.append("    li $a0, 10")  # Código ASCII para salto de línea
+                    self.output_code.append("    syscall\n")
+                    # Reinicia current_int para evitar impresiones duplicadas
+                    current_int = None
+
+
 
         final_code = (
             ".data\n"
@@ -1726,6 +1881,11 @@ class IntermediateToMIPS():
             + "\n.text\n"
             + ".globl main\n"
             + "\n".join(self.output_code)
+            #ultimas dos lineas son para indicar el "exit" del programa
+            # Load syscall number for exit into $v0
+            + "\n    li $v0, 10\n"
+            # Make syscall to exit the program
+            + "    syscall"
         )
         return final_code
 

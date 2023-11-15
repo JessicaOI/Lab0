@@ -1,0 +1,53 @@
+class Main{
+    io: IO;
+    var1: Int;
+    var2: Int;
+    var3: String;
+    var4: String;
+    var5: String;
+    var6: String;
+    var7: String;
+    var8: Int;
+
+    main(): Int{
+	var1 <- io.promptInt("Ingrese el primer numero: ");
+        var2 <- io.promptInt("Ingrese el segundo  numero: ");
+        var3 <- "Suma: ";
+        var4 <- "Resta: ";
+        var5 <- "Multiplicacion: ";
+        var6 <- "Division: ";
+        var7 <- "No se puede dividir por cero ";
+        
+        var8 <- var1 + var2;
+        io.printString(var3);
+        io.printInt(var8);
+
+        var8 <- var1 - var2;
+        io.printString(var4);
+        io.printInt(var8);
+
+        var8 <- var1 * var2;
+        io.printString(var5);
+        io.printInt(var8);
+
+    };
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

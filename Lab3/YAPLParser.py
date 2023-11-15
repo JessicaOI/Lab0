@@ -91,7 +91,7 @@ def serializedATN():
         0,0,0,225,226,5,48,0,0,226,227,5,41,0,0,227,228,3,22,11,0,228,25,
         1,0,0,0,229,230,5,48,0,0,230,233,5,22,0,0,231,234,3,28,14,0,232,
         234,3,30,15,0,233,231,1,0,0,0,233,232,1,0,0,0,234,27,1,0,0,0,235,
-        236,7,3,0,0,236,238,5,39,0,0,237,239,3,20,10,0,238,237,1,0,0,0,238,
+        236,7,3,0,0,236,238,5,39,0,0,237,239,3,22,11,0,238,237,1,0,0,0,238,
         239,1,0,0,0,239,240,1,0,0,0,240,241,5,40,0,0,241,29,1,0,0,0,242,
         243,5,48,0,0,243,245,5,39,0,0,244,246,3,20,10,0,245,244,1,0,0,0,
         245,246,1,0,0,0,246,247,1,0,0,0,247,248,5,40,0,0,248,31,1,0,0,0,
@@ -1470,8 +1470,8 @@ class YAPLParser ( Parser ):
         def PROMPT_INT(self):
             return self.getToken(YAPLParser.PROMPT_INT, 0)
 
-        def expressionList(self):
-            return self.getTypedRuleContext(YAPLParser.ExpressionListContext,0)
+        def expression(self):
+            return self.getTypedRuleContext(YAPLParser.ExpressionContext,0)
 
 
         def getRuleIndex(self):
@@ -1509,7 +1509,7 @@ class YAPLParser ( Parser ):
             _la = self._input.LA(1)
             if (((_la) & ~0x3f) == 0 and ((1 << _la) & 282087814856704) != 0):
                 self.state = 237
-                self.expressionList()
+                self.expression(0)
 
 
             self.state = 240

@@ -1,0 +1,13 @@
+class Main{
+    io: IO;
+    var2: String;
+    var4: String;
+    var3: String;
+    main(): Int{
+	    var3 <- "hola";
+        var4 <- "Hello World";
+	io.printString(var4);
+	io.printString(var3);
+    };
+};
+
