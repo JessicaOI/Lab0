@@ -1,10 +1,6 @@
 .data
-prompt0: .asciiz "ingrese True para suma, ingrese false para multiplicacion: \n"
 var1: .word 1
-prompt1: .asciiz "Ingrese un numero: \n"
-var3: .word 0
-var4: .asciiz "El valor de la operacion es: \n"
-var2: .word 0
+var4: .asciiz "verdadero\n"
 .text
 .globl main
 sum:
@@ -24,22 +20,13 @@ mul:
     lw $v0, $t2
     jr $ra
 main:
-    li $a0, 5
-    li $a1, 7
-    li $a2, 8
-    jal sum
-    move $t7, $v0
-    sw $t7, var2
+    lw $t0, var1
+    beqz $t0, L1
+    j L2
+L1:
+L2:
     li $v0, 4
     la $a0, var4
-    syscall
-
-    li $v0, 1
-    lw $a0, var2
-    syscall
-
-    li $v0, 11
-    li $a0, 10
     syscall
 
     lw $v0, var2

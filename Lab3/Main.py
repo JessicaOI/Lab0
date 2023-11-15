@@ -1773,6 +1773,9 @@ class IntermediateToMIPS():
 
         if return_reg:
             self.output_code.append(f"    sw $v0, {return_reg}")
+        
+    def is_valid_label(self, label):
+        return label.startswith("L") and label[1:].isdigit()
 
     def generate_code(self, intermediate_code):
         
@@ -1851,15 +1854,19 @@ class IntermediateToMIPS():
                     self.register_manager.release_register(source_reg)
 
             elif cmd == "if_false":
-                self.output_code.append(f"    lw {tokens[1]}, {tokens[1]}")
-                self.output_code.append(f"    beqz {tokens[1]}, {tokens[3]}")
+                register = self.register_manager.get_register()
+                self.output_code.append(f"    lw {register}, {tokens[1]}")
+                self.output_code.append(f"    beqz {register}, {tokens[3]}")
 
             elif cmd == "goto":
                 self.output_code.append(f"    j {tokens[3]}")
 
             elif cmd == "label":
-                self.labels.add(tokens[3])
-                self.output_code.append(f"{tokens[3]}:")
+                if len(tokens) > 1 and self.is_valid_label(tokens[1]):
+                    self.labels.add(tokens[1])
+                    self.output_code.append(f"{tokens[1]}:")
+                else:
+                    print(f"Advertencia: Etiqueta mal formateada o faltante en la línea '{line}'")
 
             elif cmd == "return":
                 if tokens[1].startswith('"'):

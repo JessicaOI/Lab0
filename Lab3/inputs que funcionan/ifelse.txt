@@ -1,0 +1,19 @@
+class Main{
+    io: IO;
+    var1: Bool;
+    var4: String;
+    var5: String;
+
+    main(): Int{
+        
+        if var1 then{
+            var4 <- "verdadero";}
+        else{
+            var4 <- "falso";}
+            
+        io.printString(var4);
+    };
+};
+
+
+
