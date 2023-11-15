@@ -10,10 +10,32 @@ load_string prompt1 $a0 None
 syscall_print_string None None None
 syscall_read_int None None None
 input $v0 var2 None
-assign "Division: " None var3
-/ var1 var2 $t1
+assign "Suma: " None var3
+assign "Resta: " None var4
+assign "Multiplicacion: " None var5
+assign "Division: " None var6
+assign "No se puede dividir por cero " None var7
++ var1 var2 $t1
 assign $t1 None var8
 load_string var3 $a0 None
+syscall_print_string None None None
+load_int var8 $a0 None
+syscall_print_int None None None
+- var1 var2 $t2
+assign $t2 None var8
+load_string var4 $a0 None
+syscall_print_string None None None
+load_int var8 $a0 None
+syscall_print_int None None None
+* var1 var2 $t3
+assign $t3 None var8
+load_string var5 $a0 None
+syscall_print_string None None None
+load_int var8 $a0 None
+syscall_print_int None None None
+/ var1 var2 $t4
+assign $t4 None var8
+load_string var5 $a0 None
 syscall_print_string None None None
 load_int var8 $a0 None
 syscall_print_int None None None
