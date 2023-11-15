@@ -10,8 +10,8 @@ load_string prompt1 $a0 None
 syscall_print_string None None None
 syscall_read_int None None None
 input $v0 var2 None
-assign "Suma: " None var3
-+ var1 var2 $t1
+assign "Division: " None var3
+/ var1 var2 $t1
 assign $t1 None var8
 load_string var3 $a0 None
 syscall_print_string None None None

@@ -1,0 +1,22 @@
+class Main{
+    io: IO;
+    var1: Int;
+    var2: Int;
+    var3: String;
+    var4: String;
+    var5: String;
+    var6: String;
+    var7: String;
+    var8: Int;
+
+    main(): Int{
+	var1 <- io.promptInt("Ingrese el primer numero: ");
+        var2 <- io.promptInt("Ingrese el segundo  numero: ");
+        var3 <- "Resta: ";
+        
+        var8 <- var1 - var2;
+        io.printString(var3);
+        io.printInt(var8);
+
+    };
+};

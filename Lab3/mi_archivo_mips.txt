@@ -3,7 +3,7 @@ prompt0: .asciiz "Ingrese el primer numero: \n"
 var1: .word 0
 prompt1: .asciiz "Ingrese el segundo  numero: \n"
 var2: .word 0
-var3: .asciiz "Suma: \n"
+var3: .asciiz "Division: \n"
 var8: .word 0
 .text
 .globl main
@@ -24,7 +24,10 @@ main:
     sw $v0, var2
     lw $t0, var1
     lw $t1, var2
-    add $t1, $t0, $t1
+    div $t0, $t1
+    mflo $t2
+    move $t1, $t2
+    sw $t1, var8
     li $v0, 4
     la $a0, var3
     syscall

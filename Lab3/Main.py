@@ -1777,7 +1777,7 @@ class IntermediateToMIPS():
                 # Determinar los operandos
                 reg1 = self.get_operand_register(tokens[1])
                 reg2 = self.get_operand_register(tokens[2])
-                result_reg = self.get_operand_register(tokens[3], is_dest=True)
+                result_reg = self.register_manager.get_register()  # Obtener un registro para el resultado
 
                 # Generar la operación aritmética
                 operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cmd]
@@ -1786,7 +1786,30 @@ class IntermediateToMIPS():
                     self.output_code.append(f"    mflo {result_reg}")
                 else:
                     self.output_code.append(f"    {operation} {result_reg}, {reg1}, {reg2}")
-            
+
+                # Almacenar el resultado en el registro indicado
+                self.output_code.append(f"    move {tokens[3]}, {result_reg}")
+
+                # Liberar los registros utilizados
+                self.register_manager.release_register(result_reg)
+                self.register_manager.release_register(reg1)
+                self.register_manager.release_register(reg2)
+
+            elif cmd == "assign":
+                # Verifica si el lado izquierdo de la asignación es un registro y el derecho una variable
+                if tokens[1].startswith("$"):
+                    source_reg = tokens[1]
+                    target_var = tokens[3]
+                    self.output_code.append(f"    sw {source_reg}, {target_var}")
+
+                    # Liberar el registro si es necesario
+                    if source_reg.startswith("$t"):
+                        self.register_manager.release_register(source_reg)
+                # Manejar otras asignaciones (como cadenas) de manera diferente
+                elif tokens[1].startswith('"'):
+                    # Aquí podrías manejar asignaciones de cadenas, si es necesario
+                    pass
+
             # elif cmd == "assign" and tokens[1].startswith('"'):
             #     # Asignación de una cadena a una variable
             #     string_value = tokens[1].strip('"') + '\\n'  # Elimina las comillas y añade el salto de línea
