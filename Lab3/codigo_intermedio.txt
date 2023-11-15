@@ -10,13 +10,36 @@ begin_method mul - -
 return $t2 None None
 end_method mul - -
 begin_method main - -
-if_false var1 None L1
-assign "verdadero" None var4
-goto None None L2
-label L1 - -
-assign "falso" None var4
-label L2 - -
+assign "ingrese True para suma, ingrese false para multiplicacion: " None prompt0
+load_int prompt0 $a0 None
+syscall_print_int None None None
+move $v0 $t3 None
+move $t3 var1 None
+load_int prompt0 $a0 None
+syscall_print_int None None None
+move $v0 $t4 None
+assign "Ingrese un numero: " None prompt1
+load_int prompt1 $a0 None
+syscall_print_int None None None
+move $v0 $t5 None
+move $t5 var3 None
+load_int prompt1 $a0 None
+syscall_print_int None None None
+move $v0 $t6 None
+assign "El valor de la operacion es: " None var4
+param 5 None None
+param 7 None None
+param 8 None None
+invoke_function sum 3 $t7
+assign $t7 None var2
+param 5 None None
+param 7 None None
+param 8 None None
+invoke_function sum 3 $t8
 load_string var4 $a0 None
 syscall_print_string None None None
+load_int var2 $a0 None
+syscall_print_int None None None
+return var2 None None
 end_method main - -
 end_class Main - -

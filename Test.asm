@@ -10,27 +10,29 @@ var2: .word 0
 sum:
     lw $t0, a
     lw $t1, b
-    add $t2, $t0, $t1
-    move $t1, $t2
+    add $t1, $t0, $t1
     lw $t0, c
     add $t1, $t1, $t0
-    move $t1, $t1
     lw $v0, $t1
     jr $ra
 mul:
     lw $t0, b
     lw $t1, c
     mul $t2, $t0, $t1
-    move $t2, $t2
     lw $t0, a
-    add $t1, $t0, $t2
-    move $t2, $t1
+    add $t2, $t0, $t2
     lw $v0, $t2
     jr $ra
 main:
     li $a0, 5
     li $a1, 7
+    li $a2, 8
+    jal sum
     sw $t7, var2
+    li $a3, 5
+    li $a4, 7
+    li $a5, 8
+    jal sum
     li $v0, 4
     la $a0, var4
     syscall

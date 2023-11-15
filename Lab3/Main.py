@@ -1460,20 +1460,18 @@ class GeneradorCodigoIntermedio(YAPLListener):
 
 
     def enterUserMethodCall(self, ctx: YAPLParser.UserMethodCallContext, temp_var=None):
-        method_call_signature = self.get_method_call_signature(ctx)
-        if method_call_signature in self.processed_function_calls:
-            return 
         method_name = ctx.OBJECT_ID().getText()
         arguments = [self.process_expression(expr) for expr in ctx.expressionList().expression()]
         
-        # Primero generar los cuádruplos para los parámetros
+        # Generar cuádruplos para los parámetros
         for arg in arguments:
             self.add_cuadruplo(Cuadruplo("param", arg, None, None))
         
         # Luego generar el cuádruplo para invocar la función
+        if temp_var is None:
+            temp_var = self.new_temp()
         self.add_cuadruplo(Cuadruplo("invoke_function", method_name, len(arguments), temp_var))
 
-        self.processed_function_calls.add(method_call_signature)
 
 
     def get_method_call_signature(self, ctx):
@@ -1731,19 +1729,10 @@ class IntermediateToMIPS():
         self.output_code.append(f"    addu $sp, $sp, 4")
 
     def handle_params(self, param_list):
-        # Asumimos que los parámetros se pasan mediante los registros $a0-$a3
-        for i, param in enumerate(param_list[:4]):  # Máximo 4 parámetros
-            register = f"$a{i}"
-            if param.startswith('"'):
-                # Manejo de cadenas
-                string_label = self.add_string_to_data(param.strip('"'))
-                self.output_code.append(f"    la {register}, {string_label}")
-            elif param.isdigit():
-                # Valores inmediatos
-                self.output_code.append(f"    li {register}, {param}")
-            else:
-                # Carga desde memoria omitida, se asume que el valor ya está en el registro correcto
-                pass
+        for i, param in enumerate(param_list[:4]):
+            reg = self.get_operand_register(param)
+            self.output_code.append(f"    move $a{i}, {reg}")
+            self.register_manager.release_register(reg)
 
     def get_operand_register(self, operand, is_dest=False):
         if operand.isdigit() or (operand.startswith('-') and operand[1:].isdigit()):
@@ -1796,6 +1785,8 @@ class IntermediateToMIPS():
             if cmd == "begin_method":
                 current_function = tokens[1]
                 self.output_code.append(f"{current_function}:")
+                # Reinicia el índice de parámetros para cada nueva función
+                param_index = 0
             # elif cmd == "end_method":
             #     self.output_code.append("    jr $ra")
             #     current_function = None
@@ -1877,30 +1868,18 @@ class IntermediateToMIPS():
                 self.output_code.append("    jr $ra")
 
             elif cmd == "param":
+                # Traduce cuádruplos de parámetros a instrucciones MIPS
                 param = tokens[1]
                 register = f"$a{param_index}"
                 if param.isdigit() or (param.startswith('-') and param[1:].isdigit()):
                     self.output_code.append(f"    li {register}, {param}")
-                elif param.startswith('"'):
-                    string_label = self.add_string_to_data(param.strip('"'))
-                    self.output_code.append(f"    la {register}, {string_label}")
-                param_index += 1  # Incrementa param_index para el próximo parámetro
+                else:
+                    self.output_code.append(f"    lw {register}, {param}")
+                param_index += 1
 
             elif cmd == "invoke_function":
                 function_name = tokens[1]
-                num_params = int(tokens[2]) if tokens[2].isdigit() else 0
-                return_reg = tokens[3] if len(tokens) > 3 else "None"
-                params = tokens[4:4 + num_params] if len(tokens) >= 4 + num_params else []
-
-                # Manejar la llamada a función con una cantidad variable de parámetros
-                for i, param in enumerate(params):
-                    if i < 4:  # Los primeros cuatro parámetros se pasan en $a0-$a3
-                        self.output_code.append(f"    lw $a{i}, {param}")
-
                 self.output_code.append(f"    jal {function_name}")
-
-                if return_reg:
-                    self.output_code.append(f"    move {return_reg}, $v0")
 
             elif cmd == "load_string":
                 current_string = tokens[1]  # Almacena la variable actual que contiene la cadena
