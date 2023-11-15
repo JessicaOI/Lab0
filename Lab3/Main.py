@@ -1185,6 +1185,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.processed_operations = set()
         self.prompt_counter = 0
         self.prompt_variables = {}
+        self.already_read_int = False
 
     
     # Método para obtener una nueva variable temporal
@@ -1397,43 +1398,46 @@ class GeneradorCodigoIntermedio(YAPLListener):
     def enterIoMethodCall(self, ctx: YAPLParser.IoMethodCallContext, var_name=None):
         method_name = ctx.getChild(0).getText()
         argument = self.process_expression(ctx.expression())
-        print('method_name ',method_name)
-        print('argument ',argument)
+        #print('method_name ',method_name)
+        #print('argument ',argument)
+        print(f"Procesando llamada IO: {method_name}, Argumento: {argument}, Variable de destino: {var_name}")
 
         if method_name in ["promptBool", "promptString", "promptInt"]:
             temp_reg = self.new_temp()
 
             # Revisar si el argumento es una cadena literal
+            prompt_var = None
             if argument.startswith('"') and argument.endswith('"'):
                 if argument not in self.prompt_variables:
-                    # Asignar la cadena a una nueva variable 'prompt' si aún no existe
+                    # Crear una nueva variable 'prompt'
                     prompt_var = f"prompt{self.prompt_counter}"
                     self.prompt_counter += 1
                     self.prompt_variables[argument] = prompt_var
+                    # Asignar la cadena a la nueva variable 'prompt'
                     self.add_cuadruplo(Cuadruplo("assign", argument, None, prompt_var))
+                    # Imprimir la cadena solo si se crea una nueva variable 'prompt'
+                    self.add_cuadruplo(Cuadruplo("load_string", prompt_var, "$a0", None))
+                    self.add_cuadruplo(Cuadruplo("syscall_print_string", None, None, None))
                 else:
                     # Reutilizar la variable 'prompt' existente
                     prompt_var = self.prompt_variables[argument]
 
-                argument = prompt_var
+            # Ahora, argument es la variable 'prompt', no la cadena literal
+            argument = prompt_var if prompt_var else argument
 
-            # Realizar la syscall adecuada para la entrada
-            if method_name == "promptInt":
-                self.add_cuadruplo(Cuadruplo("load_int", argument, "$a0", None))
-                self.add_cuadruplo(Cuadruplo("syscall_print_int", None, None, None))
-                self.add_cuadruplo(Cuadruplo("move", "$v0", temp_reg, None))
+            if method_name in ["promptInt", "promptBool"]:
+                if var_name is not None:  # Solo añadir syscall_read_int si var_name no es None
+                    self.add_cuadruplo(Cuadruplo("syscall_read_int", None, None, None))
+                    self.add_cuadruplo(Cuadruplo("input", "$v0", var_name, None))
             elif method_name == "promptString":
-                self.add_cuadruplo(Cuadruplo("syscall_read_string", None, None, None))
-                self.add_cuadruplo(Cuadruplo("move", "input_buffer", temp_reg, None))
-            elif method_name == "promptBool":
-                self.add_cuadruplo(Cuadruplo("load_int", argument, "$a0", None))
-                self.add_cuadruplo(Cuadruplo("syscall_print_int", None, None, None))
-                self.add_cuadruplo(Cuadruplo("move", "$v0", temp_reg, None))
+                # Aquí se manejaría la lectura de una cadena para promptString
+                pass
+                
+            # Mover el valor leído solo si hay una variable de destino
+            # if var_name is not None:
+                # self.add_cuadruplo(Cuadruplo("move", "$v0", var_name, None))
+                    
 
-            # Si hay una variable asociada con la llamada (indicando una asignación)
-            if var_name is not None:
-                self.add_cuadruplo(Cuadruplo("move", temp_reg, var_name, None))
-                self.release_temp(temp_reg)
         elif method_name == "printString":
             # Cambio de 'print_string' a 'load_string' y agregado de 'syscall_print_string'.
             self.add_cuadruplo(Cuadruplo("load_string", argument, "$a0", None))
@@ -1445,6 +1449,7 @@ class GeneradorCodigoIntermedio(YAPLListener):
         else:
             # Manejar otros posibles métodos IO si existen.
             pass
+        
 
 
 
@@ -1661,6 +1666,7 @@ class IntermediateToMIPS():
                     # Verificar si el token es una variable "prompt"
                     if token.startswith("prompt") and token[len("prompt"):].isdigit():
                         # Si es una variable "prompt", manejar como una nueva variable string
+                        self.string_variables.append(token)
                         string_value = variable_values.get(token, "")
                         self.add_string_to_data(string_value, token)
                         declared_variables.add(token)
@@ -1831,7 +1837,7 @@ class IntermediateToMIPS():
 
             elif cmd == "load_string":
                 current_string = tokens[1]  # Almacena la variable actual que contiene la cadena
-                #print('current_string', current_string)
+                #print('current_string_load', current_string)
 
             elif cmd == "load_int":
                 current_int = tokens[1]  # Almacena la variable actual que contiene el int a imprimir
@@ -1839,12 +1845,14 @@ class IntermediateToMIPS():
             elif cmd == "syscall_print_string":
                 #print('variables dentro de syscall',self.ordered_variables)
                 # En lugar de buscar el nombre de la variable, usa la lista en orden
+                #print('data section', self.data_section)
                 #print('string_variables',self.string_variables)
-                if current_string in self.string_variables:
-                    #print('variables dentro del ordered variables',self.ordered_variables)
+                current_string_stripped = current_string.strip()
+                #print('current_string_stripped', current_string_stripped)
+                if current_string_stripped in self.string_variables:
                     # Sacamos la primera variable en la lista
                     #next_variable = self.string_variables.pop(0)
-                    #print('next_variable:',next_variable)
+                    #print('current_string:',current_string)
                     data_label = self.find_data_label_for_variable(current_string)
                     #print('data label:', data_label)
                     # Load syscall number for print_str into $v0
@@ -1873,6 +1881,24 @@ class IntermediateToMIPS():
                     # Reinicia current_int para evitar impresiones duplicadas
                     current_int = None
 
+            elif cmd == "syscall_read_string":
+                self.output_code.append("    li $v0, 8")  # Código syscall para leer cadena
+                self.output_code.append("    la $a0, buffer")  # Suponiendo que 'buffer' es un espacio en memoria para la entrada
+                self.output_code.append("    li $a1, 100")  # Tamaño del buffer
+                self.output_code.append("    syscall\n")  # Realizar syscall
+
+
+            elif cmd == "syscall_read_int":
+                #se cambia el $v0 a 5 porque esta esperando un input Int
+                self.output_code.append("    li $v0, 5")
+                self.output_code.append("    syscall")
+
+            
+            elif cmd == "input":
+                # Obtiene el nombre de la variable donde se debe almacenar el valor
+                variable_name = tokens[2]
+                # Genera el código para almacenar el valor de $v0 en la variable
+                self.output_code.append(f"    sw $v0, {variable_name}")
 
 
         final_code = (
