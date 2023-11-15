@@ -1,21 +1,36 @@
-class MainClass {
-    var1: Int; 
-    var2 String; 
-    mainMethod(arg1: Int, arg2: String): Int {
-        if var1 then
-            var2 <- "true branch"
-        else
-            var2 "false branch"; 
-        ; 
-        return 0
-    }; 
-class SecondClass inherits MainClass {
-    var3: Bool
-    secondMethod(): Int {
-        while var3 loop
-            var1 <- var1 + ; 
-        pool;
-        return var1;
-    }
+class Main {
+    var1: Bool;
+    var2: Int;
+    var3: Int;
+    var4: String;
+
+    sum(a: Int, b: Int, c: Int): Int {
+        return a + b + c;
+    };
+
+    mul(a: Int, b: Int, c: Int): Int {
+        return a + b * c;
+    };
+
+    main(): Int {
+
+        var1 <- io.promptBool("ingrese True para suma, ingrese false para multiplicacion: ");
+        var3 <- io.promptInt("Ingrese un numero: ");
+        var4 <- "El valor de la operacion es: ";
+
+        if var1 then{
+            var2 <- self.sum(5, 7, var3);}
+        else{
+            var2 <- self.mul(5, 7, var3);}
+        
+
+        io.printString(var4);
+	io.printString(var4);
+        io.printInt(var2);
+
+	return var2;
+    };
+};
+
 
 

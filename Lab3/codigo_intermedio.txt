@@ -1,43 +1,12 @@
 begin_class Main - -
 begin_method main - -
-assign "Ingrese el primer numero: " None prompt0
-load_string prompt0 $a0 None
-syscall_print_string None None None
-syscall_read_int None None None
-input $v0 var1 None
-assign "Ingrese el segundo  numero: " None prompt1
-load_string prompt1 $a0 None
-syscall_print_string None None None
-syscall_read_int None None None
-input $v0 var2 None
-assign "Suma: " None var3
-assign "Resta: " None var4
-assign "Multiplicacion: " None var5
-assign "Division: " None var6
-assign "No se puede dividir por cero " None var7
-+ var1 var2 $t1
-assign $t1 None var8
-load_string var3 $a0 None
-syscall_print_string None None None
-load_int var8 $a0 None
-syscall_print_int None None None
-- var1 var2 $t2
-assign $t2 None var8
+if_false var1 None L1
+assign "verdadero" None var4
+goto None None L2
+label L1 - -
+assign "falso" None var4
+label L2 - -
 load_string var4 $a0 None
 syscall_print_string None None None
-load_int var8 $a0 None
-syscall_print_int None None None
-* var1 var2 $t3
-assign $t3 None var8
-load_string var5 $a0 None
-syscall_print_string None None None
-load_int var8 $a0 None
-syscall_print_int None None None
-/ var1 var2 $t4
-assign $t4 None var8
-load_string var5 $a0 None
-syscall_print_string None None None
-load_int var8 $a0 None
-syscall_print_int None None None
 end_method main - -
 end_class Main - -
