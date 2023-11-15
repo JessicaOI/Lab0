@@ -1,61 +1,56 @@
 .data
-prompt0: .asciiz "Ingrese el primer numero: \n"
-var1: .word 0
-prompt1: .asciiz "Ingrese el segundo  numero: \n"
+prompt0: .asciiz "ingrese True para suma, ingrese false para multiplicacion: \n"
+var1: .word 1
+prompt1: .asciiz "Ingrese un numero: \n"
+var3: .word 0
 var2: .word 0
-var3: .asciiz "Suma: \n"
-var4: .asciiz "Resta: \n"
-var5: .asciiz "Multiplicacion: \n"
-var6: .asciiz "Division: \n"
-var7: .asciiz "No se puede dividir por cero \n"
-var8: .word 0
 .text
 .globl main
+sum:
+    lw $t0, a
+    lw $t1, b
+    add $t1, $t0, $t1
+    lw $t2, c
+    add $t1, $t1, $t2
+    lw $v0, $t1
+    jr $ra
+mul:
+    lw $t3, b
+    lw $t4, c
+    mul $t2, $t3, $t4
+    lw $t5, a
+    add $t2, $t5, $t2
+    lw $v0, $t2
+    jr $ra
 main:
-    lw $t0, var1
-    lw $t1, var2
-    add $t5, $t0, $t1
-    li $v0, 4
-    la $a0, var3
-    syscall
-
+    lw var1, var1
+    beqz var1, L1
+    li $a0, 5
+    li $a1, 7
+    jal sum
+    sw $v0, $t7
+    j L2
+-:
+    li $a3, 5
+    li $a4, 7
+    jal mul
+    sw $v0, $t8
+-:
+    li $a6, 5
+    li $a7, 7
+    jal sum
+    li $a9, 5
+    li $a10, 7
+    jal mul
     li $v0, 1
-    lw $a0, var8
+    lw $a0, var2
     syscall
 
     li $v0, 11
     li $a0, 10
     syscall
 
-    lw $t2, var1
-    lw $t3, var2
-    sub $t6, $t2, $t3
-    li $v0, 4
-    la $a0, var4
-    syscall
-
-    li $v0, 1
-    lw $a0, var8
-    syscall
-
-    li $v0, 11
-    li $a0, 10
-    syscall
-
-    lw $t4, var1
-    lw $t5, var2
-    mul $t7, $t4, $t5
-    li $v0, 4
-    la $a0, var5
-    syscall
-
-    li $v0, 1
-    lw $a0, var8
-    syscall
-
-    li $v0, 11
-    li $a0, 10
-    syscall
-
+    lw $v0, var2
+    jr $ra
     li $v0, 10
     syscall

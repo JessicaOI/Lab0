@@ -757,6 +757,10 @@ class MyYAPLListener(YAPLListener):
 
     def enterFeature(self, ctx):
         # print(f"Entrando a enterFeature en línea {ctx.start.line}: {ctx.getText()[:100]}...")
+
+
+           
+
         self.has_attribute = True
 
         # Obteniendo los object_ids y type_ids
@@ -782,6 +786,12 @@ class MyYAPLListener(YAPLListener):
         for object_id, type_id in zip(object_ids, type_ids):
             object_id = object_id.getText()
             type_id = type_id.getText()
+
+            if type_id not in self.basic_types and type_id != "IO":
+                self.semantic_errors.append(
+                    f"Error en línea {ctx.start.line}: Tipo '{type_id}' no reconocido."
+                )
+                continue
 
             if ctx.LPAREN():  # Si hay paréntesis, es un método
                 symbol_type = SymbolType.FUNCTION
@@ -1084,11 +1094,14 @@ class MyYAPLListener(YAPLListener):
         object_ids = (
             ctx.OBJECT_ID() if isinstance(ctx.OBJECT_ID(), list) else [ctx.OBJECT_ID()]
         )
+
+        
         type_ids = ctx.TYPE_ID() if isinstance(ctx.TYPE_ID(), list) else [ctx.TYPE_ID()]
+
+     
         for object_id, type_id in zip(object_ids, type_ids):
             object_id = object_id.getText()
             type_id = type_id.getText()
-
             if type_id in self.basic_types:
                 pass_method = "byValue"
             else:
