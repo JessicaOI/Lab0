@@ -1183,6 +1183,8 @@ class GeneradorCodigoIntermedio(YAPLListener):
         self.available_temporaries = []
         self.processed_temporaries = set()
         self.processed_operations = set()
+        self.prompt_counter = 0
+        self.prompt_variables = {}
 
     
     # Método para obtener una nueva variable temporal
@@ -1395,12 +1397,43 @@ class GeneradorCodigoIntermedio(YAPLListener):
     def enterIoMethodCall(self, ctx: YAPLParser.IoMethodCallContext, var_name=None):
         method_name = ctx.getChild(0).getText()
         argument = self.process_expression(ctx.expression())
+        print('method_name ',method_name)
+        print('argument ',argument)
 
         if method_name in ["promptBool", "promptString", "promptInt"]:
-            # Si hay una variable asociada con la llamada (indicando una asignación), genera un cuádruplo 'call'.
+            temp_reg = self.new_temp()
+
+            # Revisar si el argumento es una cadena literal
+            if argument.startswith('"') and argument.endswith('"'):
+                if argument not in self.prompt_variables:
+                    # Asignar la cadena a una nueva variable 'prompt' si aún no existe
+                    prompt_var = f"prompt{self.prompt_counter}"
+                    self.prompt_counter += 1
+                    self.prompt_variables[argument] = prompt_var
+                    self.add_cuadruplo(Cuadruplo("assign", argument, None, prompt_var))
+                else:
+                    # Reutilizar la variable 'prompt' existente
+                    prompt_var = self.prompt_variables[argument]
+
+                argument = prompt_var
+
+            # Realizar la syscall adecuada para la entrada
+            if method_name == "promptInt":
+                self.add_cuadruplo(Cuadruplo("load_int", argument, "$a0", None))
+                self.add_cuadruplo(Cuadruplo("syscall_print_int", None, None, None))
+                self.add_cuadruplo(Cuadruplo("move", "$v0", temp_reg, None))
+            elif method_name == "promptString":
+                self.add_cuadruplo(Cuadruplo("syscall_read_string", None, None, None))
+                self.add_cuadruplo(Cuadruplo("move", "input_buffer", temp_reg, None))
+            elif method_name == "promptBool":
+                self.add_cuadruplo(Cuadruplo("load_int", argument, "$a0", None))
+                self.add_cuadruplo(Cuadruplo("syscall_print_int", None, None, None))
+                self.add_cuadruplo(Cuadruplo("move", "$v0", temp_reg, None))
+
+            # Si hay una variable asociada con la llamada (indicando una asignación)
             if var_name is not None:
-                io_command = method_name[0].lower() + method_name[1:]  # "promptBool" a "promptbool"
-                self.add_cuadruplo(Cuadruplo("call", f"io.{io_command}", argument, var_name))
+                self.add_cuadruplo(Cuadruplo("move", temp_reg, var_name, None))
+                self.release_temp(temp_reg)
         elif method_name == "printString":
             # Cambio de 'print_string' a 'load_string' y agregado de 'syscall_print_string'.
             self.add_cuadruplo(Cuadruplo("load_string", argument, "$a0", None))
@@ -1573,6 +1606,7 @@ class IntermediateToMIPS():
         self.register_manager = RegisterManager()
         self.ordered_variables = []  # Lista para mantener las variables en orden
         self.string_variables = []
+        self.integer_variables = []
 
     def add_string_to_data(self, string, label=None):
         # Solo crea una etiqueta y agrega la cadena si se proporciona una etiqueta válida
@@ -1624,6 +1658,12 @@ class IntermediateToMIPS():
             for token in tokens:
                 # Solo considera tokens que son nombres de variables válidos
                 if self.is_valid_variable_name(token) and token not in declared_variables:
+                    # Verificar si el token es una variable "prompt"
+                    if token.startswith("prompt") and token[len("prompt"):].isdigit():
+                        # Si es una variable "prompt", manejar como una nueva variable string
+                        string_value = variable_values.get(token, "")
+                        self.add_string_to_data(string_value, token)
+                        declared_variables.add(token)
                     # Buscar el símbolo en la tabla de símbolos para obtener el tipo
                     symbol = next((s for s in self.symbol_table.symbols if s.name == token), None)
                     if symbol:
@@ -1633,8 +1673,10 @@ class IntermediateToMIPS():
                         if symbol.symbol_type == SymbolType.VARIABLE:
                             if symbol.semantic_type == "Int":
                                 self.data_section.append(f"{token}: .word 0")
+                                self.integer_variables.append(token)
                             elif symbol.semantic_type == "String":
                                 self.string_variables.append(token)  # Agregar la variable a la lista de variables string
+                                #print('variables que se van agregando al array:',self.string_variables)
                                 string_value = variable_values.get(token, "")
                                 #self.data_section.append(f'{token}: .asciiz "{string_value}"')
                                 self.add_string_to_data(string_value,token)
@@ -1697,6 +1739,7 @@ class IntermediateToMIPS():
         current_function = None
         param_index = 0  # Inicialización de param_index
         current_string = None  # Variable para almacenar la última cadena cargada
+        current_int = None  # Variable para almacenar la última cadena cargada
 
         for line in lines:
             tokens = line.split()
@@ -1788,11 +1831,15 @@ class IntermediateToMIPS():
 
             elif cmd == "load_string":
                 current_string = tokens[1]  # Almacena la variable actual que contiene la cadena
-                print('current_string', current_string)
+                #print('current_string', current_string)
+
+            elif cmd == "load_int":
+                current_int = tokens[1]  # Almacena la variable actual que contiene el int a imprimir
 
             elif cmd == "syscall_print_string":
                 #print('variables dentro de syscall',self.ordered_variables)
                 # En lugar de buscar el nombre de la variable, usa la lista en orden
+                #print('string_variables',self.string_variables)
                 if current_string in self.string_variables:
                     #print('variables dentro del ordered variables',self.ordered_variables)
                     # Sacamos la primera variable en la lista
@@ -1806,12 +1853,26 @@ class IntermediateToMIPS():
                     self.output_code.append(f"    la $a0, {data_label}")
                      # Make syscall to print the string
                     self.output_code.append("    syscall\n")
-                    # Load syscall number for exit into $v0
-                    self.output_code.append("    li $v0, 10")
-                    # Make syscall to exit the program
-                    self.output_code.append("    syscall\n")
                     # Reinicia current_string para evitar impresiones duplicadas
                     current_string = None
+
+            elif cmd == "syscall_print_int":
+                #print('integer_variables',self.integer_variables)
+                if current_int in self.integer_variables:
+                    data_label = self.find_data_label_for_variable(current_int)
+                    # Load syscall number for print_int into $v0
+                    self.output_code.append("    li $v0, 1")
+                    # Load the integer value into $a0
+                    self.output_code.append(f"    lw $a0, {data_label}")
+                    # Make syscall to print the integer
+                    self.output_code.append("    syscall\n")
+                    # Agrega un salto de línea después de imprimir el entero
+                    self.output_code.append("    li $v0, 11")  # Syscall para imprimir carácter
+                    self.output_code.append("    li $a0, 10")  # Código ASCII para salto de línea
+                    self.output_code.append("    syscall\n")
+                    # Reinicia current_int para evitar impresiones duplicadas
+                    current_int = None
+
 
 
         final_code = (
@@ -1820,6 +1881,11 @@ class IntermediateToMIPS():
             + "\n.text\n"
             + ".globl main\n"
             + "\n".join(self.output_code)
+            #ultimas dos lineas son para indicar el "exit" del programa
+            # Load syscall number for exit into $v0
+            + "\n    li $v0, 10\n"
+            # Make syscall to exit the program
+            + "    syscall"
         )
         return final_code
 

@@ -1,11 +1,60 @@
 .data
-var3: .asciiz "hola\n"
-var4: .asciiz "Hello World\n"
+prompt0: .asciiz "Ingrese el primer numero: \n"
+var1: .word 0
+prompt1: .asciiz "Ingrese el segundo  numero: \n"
+var2: .word 0
+var3: .asciiz "Suma: \n"
+var4: .asciiz "Resta: \n"
+var5: .asciiz "Multiplicacion: \n"
+var6: .asciiz "Division: \n"
+var7: .asciiz "No se puede dividir por cero \n"
+var8: .word 0
 .text
 .globl main
 main:
+    lw $t0, var1
+    lw $t1, var2
+    add $t5, $t0, $t1
+    li $v0, 4
+    la $a0, var3
+    syscall
+
+    li $v0, 1
+    lw $a0, var8
+    syscall
+
+    li $v0, 11
+    li $a0, 10
+    syscall
+
+    lw $t2, var1
+    lw $t3, var2
+    sub $t6, $t2, $t3
     li $v0, 4
     la $a0, var4
+    syscall
+
+    li $v0, 1
+    lw $a0, var8
+    syscall
+
+    li $v0, 11
+    li $a0, 10
+    syscall
+
+    lw $t4, var1
+    lw $t5, var2
+    mul $t7, $t4, $t5
+    li $v0, 4
+    la $a0, var5
+    syscall
+
+    li $v0, 1
+    lw $a0, var8
+    syscall
+
+    li $v0, 11
+    li $a0, 10
     syscall
 
     li $v0, 10
