@@ -1,29 +1,12 @@
 .data
-prompt0: .asciiz "ingrese True para suma, ingrese false para multiplicacion: \n"
-var1: .word 1
-prompt1: .asciiz "Ingrese un numero: \n"
-var3: .word 0
+prompt0: .asciiz "Ingrese el primer numero: \n"
+var1: .word 0
+prompt1: .asciiz "Ingrese el segundo  numero: \n"
 var2: .word 0
 var3: .asciiz "Suma: \n"
 var8: .word 0
 .text
 .globl main
-sum:
-    lw $t0, a
-    lw $t1, b
-    add $t1, $t0, $t1
-    lw $t2, c
-    add $t1, $t1, $t2
-    lw $v0, $t1
-    jr $ra
-mul:
-    lw $t3, b
-    lw $t4, c
-    mul $t2, $t3, $t4
-    lw $t5, a
-    add $t2, $t5, $t2
-    lw $v0, $t2
-    jr $ra
 main:
     li $v0, 4
     la $a0, prompt0

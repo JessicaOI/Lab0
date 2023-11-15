@@ -1,14 +1,4 @@
 begin_class Main - -
-begin_method sum - -
-+ a b $t1
-+ $t1 c $t1
-return $t1 None None
-end_method sum - -
-begin_method mul - -
-* b c $t2
-+ a $t2 $t2
-return $t2 None None
-end_method mul - -
 begin_method main - -
 assign "Ingrese el primer numero: " None prompt0
 load_string prompt0 $a0 None
