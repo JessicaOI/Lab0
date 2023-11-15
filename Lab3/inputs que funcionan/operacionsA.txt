@@ -10,7 +10,7 @@ class Main{
     var8: Int;
 
     main(): Int{
-	    var1 <- io.promptInt("Ingrese el primer numero: ");
+	var1 <- io.promptInt("Ingrese el primer numero: ");
         var2 <- io.promptInt("Ingrese el segundo  numero: ");
         var3 <- "Suma: ";
         var4 <- "Resta: ";
@@ -32,6 +32,7 @@ class Main{
 
     };
 };
+
 
 
 
