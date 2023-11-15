@@ -17,20 +17,20 @@ class Main {
         var1 <- io.promptBool("ingrese True para suma, ingrese false para multiplicacion: ");
         var3 <- io.promptInt("Ingrese un numero: ");
         var4 <- "El valor de la operacion es: ";
+	
 
-        if var1 then{
-            var2 <- self.sum(5, 7, var3);}
-        else{
-            var2 <- self.mul(5, 7, var3);}
+  
+        var2 <- self.sum(5, 7, 8);
         
-
         io.printString(var4);
-	io.printString(var4);
         io.printInt(var2);
 
 	return var2;
     };
 };
+
+
+
 
 
 

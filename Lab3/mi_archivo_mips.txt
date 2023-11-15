@@ -1,53 +1,37 @@
 .data
-prompt0: .asciiz "Ingrese el primer numero: \n"
-var1: .word 0
-prompt1: .asciiz "Ingrese el segundo  numero: \n"
+prompt0: .asciiz "ingrese True para suma, ingrese false para multiplicacion: \n"
+var1: .word 1
+prompt1: .asciiz "Ingrese un numero: \n"
+var3: .word 0
+var4: .asciiz "El valor de la operacion es: \n"
 var2: .word 0
-var3: .asciiz "Division: \n"
-var8: .word 0
 .text
 .globl main
+sum:
+    lw $t0, a
+    lw $t1, b
+    add $t1, $t0, $t1
+    lw $t0, c
+    add $t1, $t1, $t0
+    lw $v0, $t1
+    jr $ra
+mul:
+    lw $t0, b
+    lw $t1, c
+    mul $t2, $t0, $t1
+    lw $t0, a
+    add $t2, $t0, $t2
+    lw $v0, $t2
+    jr $ra
 main:
-    lw var1, var1
-    beqz var1, L1
     li $a0, 5
     li $a1, 7
-    subu $sp, $sp, 4
-    sw $ra, 0($sp)
+    li $a2, 8
     jal sum
-    lw $ra, 0($sp)
-    addu $sp, $sp, 4
     move $t7, $v0
-    j L2
--:
-    li $a3, 5
-    li $a4, 7
-    subu $sp, $sp, 4
-    sw $ra, 0($sp)
-    jal mul
-    lw $ra, 0($sp)
-    addu $sp, $sp, 4
-    move $t8, $v0
--:
+    sw $t7, var2
     li $v0, 4
     la $a0, var4
-    syscall
-
-    li $v0, 4
-    la $a0, prompt1
-    syscall
-
-    li $v0, 5
-    syscall
-    sw $v0, var2
-    lw $t0, var1
-    lw $t1, var2
-    div $t0, $t1
-    mflo $t2
-    move $t1, $t2
-    sw $t1, var8
-    li $v0, 4
-    la $a0, var3
     syscall
 
     li $v0, 1

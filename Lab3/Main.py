@@ -1762,6 +1762,17 @@ class IntermediateToMIPS():
             temp_reg = self.register_manager.get_register()
             self.output_code.append(f"    lw {temp_reg}, {operand}")
             return temp_reg
+    
+    def handle_function_call(self, function_name, params, return_reg):
+        # Asumir que params es una lista de los nombres de los parámetros
+        for i, param in enumerate(params):
+            if i < 4:  # Manejar solo los primeros cuatro parámetros
+                self.output_code.append(f"    lw $a{i}, {param}")
+
+        self.output_code.append(f"    jal {function_name}")
+
+        if return_reg:
+            self.output_code.append(f"    sw $v0, {return_reg}")
 
     def generate_code(self, intermediate_code):
         
@@ -1785,27 +1796,19 @@ class IntermediateToMIPS():
             # elif cmd == "end_method":
             #     self.output_code.append("    jr $ra")
             #     current_function = None
-            elif cmd in ["+", "-", "*", "/"]:
-                # Determinar los operandos
+            if cmd in ["+", "-", "*", "/"]:
+                # Generar operaciones aritméticas simplificadas
                 reg1 = self.get_operand_register(tokens[1])
                 reg2 = self.get_operand_register(tokens[2])
-                result_reg = self.register_manager.get_register()  # Obtener un registro para el resultado
+                result_reg = self.get_operand_register(tokens[3], is_dest=True)
 
-                # Generar la operación aritmética
                 operation = {"+": "add", "-": "sub", "*": "mul", "/": "div"}[cmd]
-                if cmd == "/":
-                    self.output_code.append(f"    {operation} {reg1}, {reg2}")
-                    self.output_code.append(f"    mflo {result_reg}")
-                else:
-                    self.output_code.append(f"    {operation} {result_reg}, {reg1}, {reg2}")
-
-                # Almacenar el resultado en el registro indicado
-                self.output_code.append(f"    move {tokens[3]}, {result_reg}")
+                self.output_code.append(f"    {operation} {result_reg}, {reg1}, {reg2}")
 
                 # Liberar los registros utilizados
-                self.register_manager.release_register(result_reg)
                 self.register_manager.release_register(reg1)
                 self.register_manager.release_register(reg2)
+                self.register_manager.release_register(result_reg)
 
             elif cmd == "assign":
                 # Verifica si el lado izquierdo de la asignación es un registro y el derecho una variable
@@ -1878,26 +1881,18 @@ class IntermediateToMIPS():
 
             elif cmd == "invoke_function":
                 function_name = tokens[1]
-                num_params = int(tokens[2])
-                return_reg = tokens[3]
+                num_params = int(tokens[2]) if tokens[2].isdigit() else 0
+                return_reg = tokens[3] if len(tokens) > 3 else "None"
+                params = tokens[4:4 + num_params] if len(tokens) >= 4 + num_params else []
 
-                # Guardar el estado actual de los registros
-                self.push_to_stack("$ra")
+                # Manejar la llamada a función con una cantidad variable de parámetros
+                for i, param in enumerate(params):
+                    if i < 4:  # Los primeros cuatro parámetros se pasan en $a0-$a3
+                        self.output_code.append(f"    lw $a{i}, {param}")
 
-                # Si hay más de 4 parámetros, se deben pasar por la pila
-                for i in range(num_params - 1, 3, -1):
-                    self.push_to_stack(f"$a{i}")
-
-                # Llamada a la función
                 self.output_code.append(f"    jal {function_name}")
 
-                # Restaurar el estado de los registros después de la llamada
-                for i in range(4, num_params):
-                    self.pop_from_stack(f"$a{i}")
-
-                self.pop_from_stack("$ra")
-
-                if return_reg != "None":
+                if return_reg:
                     self.output_code.append(f"    move {return_reg}, $v0")
 
             elif cmd == "load_string":
