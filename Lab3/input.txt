@@ -2,7 +2,7 @@ class Main {
     var1: Bool;
     var2: Int;
     var3: Int;
-    var4: Srrasdjawodbaoda;
+    var4: String;
 
     sum(a: Int, b: Int, c: Int): Int {
         return a + b + c;
@@ -31,10 +31,6 @@ class Main {
 	return var2;
     };
 };
-
-
-
-
 
 
 

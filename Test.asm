@@ -1,54 +1,67 @@
 .data
-var1: .word 1          # Inicializa var1 con 1 (verdadero) o 0 (falso)
-var2: .asciiz "intento"
+prompt0: .asciiz "ingrese True para suma, ingrese false para multiplicacion: \n"
+var1: .word 1
+prompt1: .asciiz "Ingrese un numero: \n"
 var3: .word 0
-prompt: .asciiz "El resultado es: "
-newLine: .asciiz "\n"
-
+var4: .asciiz "El valor de la operacion es: \n"
+var2: .word 0
 .text
 .globl main
-
+sum:
+    lw $t0, a
+    lw $t1, b
+    add $t1, $t0, $t1
+    lw $t2, c
+    add $t1, $t1, $t2
+    lw $v0, $t1
+    jr $ra
+mul:
+    lw $t3, b
+    lw $t4, c
+    mul $t2, $t3, $t4
+    lw $t5, a
+    add $t2, $t5, $t2
+    lw $v0, $t2
+    jr $ra
 main:
-    # Verificar el valor de var1
-    lw $t0, var1
-    beqz $t0, else_branch   # Si var1 es 0, ir a la rama else
-
-    # Rama then: llamar a sum(5, 7, 9)
+    lw var1, var1
+    beqz var1, L1
     li $a0, 5
     li $a1, 7
-    li $a2, 9
+    subu $sp, $sp, 4
+    sw $ra, 0($sp)
     jal sum
-    sw $v0, var3          # Guardar el resultado de sum en var3
-
-    # Imprimir el resultado de sum
+    lw $ra, 0($sp)
+    addu $sp, $sp, 4
+    move $t7, $v0
+    j L2
+-:
+    li $a3, 5
+    li $a4, 7
+    subu $sp, $sp, 4
+    sw $ra, 0($sp)
+    jal mul
+    lw $ra, 0($sp)
+    addu $sp, $sp, 4
+    move $t8, $v0
+-:
     li $v0, 4
-    la $a0, prompt
+    la $a0, var4
+    syscall
+
+    li $v0, 4
+    la $a0, var4
     syscall
 
     li $v0, 1
-    lw $a0, var3
+    lw $a0, var2
     syscall
 
-    j end_main
-
-else_branch:
-    # Rama else: imprimir "intento"
-    li $v0, 4
-    la $a0, var2
+    li $v0, 11
+    li $a0, 10
     syscall
 
-end_main:
-    # Imprimir nueva línea
-    li $v0, 4
-    la $a0, newLine
-    syscall
-
-    # Terminar programa
+    lw $v0, var2
+    jr $ra
     li $v0, 10
     syscall
-
-# Función sum que calcula a + b * c
-sum:
-    mul $t0, $a1, $a2  # $t0 = b * c
-    add $v0, $a0, $t0  # $v0 = a + ($t0 = b * c)
-    jr $ra             # Retornar al llamador
