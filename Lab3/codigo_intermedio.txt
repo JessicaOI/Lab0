@@ -1,17 +1,21 @@
 begin_class Main - -
-begin_method sum - -
-+ a b $t1
-+ $t1 c $t1
-return $t1 None None
-end_method sum - -
-begin_method mul - -
-* b c $t2
-+ a $t2 $t2
-return $t2 None None
-end_method mul - -
 begin_method main - -
-assign "ingrese True para suma, ingrese false para multiplicacion: " None prompt0
-load_int prompt0 $a0 None
+assign "Ingrese el primer numero: " None prompt0
+load_string prompt0 $a0 None
+syscall_print_string None None None
+syscall_read_int None None None
+input $v0 var1 None
+assign "Ingrese el segundo  numero: " None prompt1
+load_string prompt1 $a0 None
+syscall_print_string None None None
+syscall_read_int None None None
+input $v0 var2 None
+assign "Division: " None var3
+/ var1 var2 $t1
+assign $t1 None var8
+load_string var3 $a0 None
+syscall_print_string None None None
+load_int var8 $a0 None
 syscall_print_int None None None
 move $v0 $t3 None
 move $t3 var1 None
